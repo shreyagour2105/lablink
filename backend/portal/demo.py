@@ -1,51 +1,62 @@
-"""Isolated, browser-scoped demonstration. This module uses no database."""
+"""Browser-scoped demonstration with simulated records and no database."""
 
-import json
-
+from django import forms
 from django.conf import settings
+from django.core import signing
 from django.http import HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
+from .demo_scheduling import UNITS, can_approve, feasible, initial_rows, new_row, scenario
+
 COOKIE = "lablink_demo"
-SALT = "lablink.demo.v1"
+SALT = "lablink.demo.v2"
 MAX_AGE = 8 * 60 * 60
 MAX_REQUESTS = 8
 ROLES = ("student", "faculty")
-UNITS = {
-    "printer": ("FDM 3D Printer", "Mechanical Engineering", "Prototype fabrication"),
-    "scope": ("Digital Oscilloscope", "Electrical Engineering", "Signal analysis"),
-    "station": ("GPU Workstation", "Computer Science", "GPU computing"),
-}
-SLOTS = ("09:00–10:00", "10:00–11:00", "11:00–12:00")
-PROJECTS = ("Prototype enclosure", "Sensor calibration", "Image analysis")
 
 
-def initial_state():
-    return {"role": "", "requests": [
-        {"unit": "printer", "slot": SLOTS[0], "project": PROJECTS[0], "status": "pending"},
-    ]}
+class DemoRequestForm(forms.Form):
+    title = forms.CharField(max_length=60, label="Project title", initial="Lab bracket prototype")
+    purpose = forms.CharField(max_length=100, initial="Print a test part.")
+    start = forms.TimeField(label="Preferred start", widget=forms.TimeInput(attrs={"type": "time"}), initial="09:00")
+    end = forms.TimeField(label="Latest acceptable end", widget=forms.TimeInput(attrs={"type": "time"}), initial="12:00")
+    deadline = forms.TimeField(label="Project deadline", widget=forms.TimeInput(attrs={"type": "time"}), initial="12:00")
+    capability = forms.ChoiceField(
+        label="Required capability",
+        choices=[(unit[2], unit[2]) for unit in UNITS.values()],
+    )
+    minutes = forms.TypedChoiceField(label="Required minutes", choices=[(n, n) for n in (30, 45, 60, 90, 120)], coerce=int, initial=60)
+
+    def clean(self):
+        data = super().clean()
+        for key in ("start", "end", "deadline"):
+            if clock := data.get(key):
+                if clock.second or clock.microsecond or clock.minute % 15:
+                    self.add_error(key, "Use a 15-minute boundary.")
+                else:
+                    data[key] = clock.hour * 60 + clock.minute
+        return data
 
 
 def read_state(request):
-    raw = request.get_signed_cookie(COOKIE, default=None, salt=SALT, max_age=MAX_AGE)
-    return json.loads(raw) if raw is not None else initial_state()
+    try:
+        return signing.loads(request.COOKIES.get(COOKIE, ""), salt=SALT, max_age=MAX_AGE)
+    except signing.BadSignature:
+        return {"role": "", "requests": initial_rows()}
 
 
-def save_state(response, state):
-    response.set_signed_cookie(
-        COOKIE, json.dumps(state, separators=(",", ":")), salt=SALT, max_age=MAX_AGE,
-        httponly=True, secure=settings.AUTH_COOKIE_SECURE, samesite="Lax", path="/demo/",
+def save_state(state, role):
+    value = signing.dumps(state, salt=SALT, compress=True)
+    if len(value) > 3600:
+        return HttpResponseBadRequest("Demo storage is full. Start with a fresh browser profile.")
+    response = redirect(f"demo-{role}")
+    response.set_cookie(
+        COOKIE, value, max_age=MAX_AGE, httponly=True,
+        secure=settings.AUTH_COOKIE_SECURE, samesite="Lax", path="/demo/",
     )
     return response
-
-
-def slot_reserved(rows, unit, slot):
-    return any(
-        row["status"] == "approved" and row["unit"] == unit and row["slot"] == slot
-        for row in rows
-    )
 
 
 @never_cache
@@ -62,23 +73,24 @@ def enter(request):
         return HttpResponseBadRequest("Choose Student or Faculty.")
     state = read_state(request)
     state["role"] = role
-    return save_state(redirect(f"demo-{role}"), state)
+    return save_state(state, role)
 
 
-def render_workspace(request, state, *, error=None, status=200):
-    role = state["role"]
-    rows = state["requests"]
+def render_workspace(request, state, *, error=None, status=200, bound_form=None, bound_unit=None):
     query = request.GET.get("q", "").strip()[:100]
-    units = [
-        {"id": key, "name": name, "department": department, "capability": capability,
-         "slots": [slot for slot in SLOTS if not slot_reserved(rows, key, slot)]}
-        for key, (name, department, capability) in UNITS.items()
-        if query.casefold() in f"{name} {department} {capability}".casefold()
+    department = request.GET.get("department", "")
+    units, requests = scenario(state["requests"])
+    filtered = [
+        {**item, "form": bound_form if item["id"] == bound_unit else DemoRequestForm(auto_id=f'{item["id"]}_%s', initial={"capability": item["capability"]})}
+        for item in units
+        if query.casefold() in f'{item["name"]} {item["department"]} {item["capability"]}'.casefold()
+        and (not department or item["department"] == department)
     ]
-    requests = [{"number": i, "equipment": UNITS[row["unit"]][0], **row} for i, row in enumerate(rows)]
     return render(request, "demo_workspace.html", {
-        "demo_role": role, "units": units, "query": query, "projects": PROJECTS,
-        "requests": requests, "error": error, "at_limit": len(rows) >= MAX_REQUESTS,
+        "demo_role": state["role"], "units": filtered, "query": query,
+        "departments": sorted({item["department"] for item in units}), "department": department,
+        "requests": requests, "schedule": units, "error": error,
+        "at_limit": len(state["requests"]) >= MAX_REQUESTS,
     }, status=status)
 
 
@@ -99,14 +111,20 @@ def submit(request):
     state = read_state(request)
     if state["role"] != "student":
         return HttpResponseForbidden("A student demo session is required.")
-    unit, slot, project = (request.POST.get(field) for field in ("unit", "slot", "project"))
+    unit = request.POST.get("unit")
+    if unit not in UNITS:
+        return HttpResponseBadRequest("Choose a fictional equipment unit.")
+    form = DemoRequestForm(request.POST, auto_id=f"{unit}_%s")
+    if not form.is_valid():
+        return render_workspace(request, state, status=400, bound_form=form, bound_unit=unit)
     rows = state["requests"]
-    if unit not in UNITS or slot not in SLOTS or project not in PROJECTS:
-        return render_workspace(request, state, error="Select a listed demo project and time.", status=400)
-    if len(rows) >= MAX_REQUESTS or slot_reserved(rows, unit, slot):
-        return render_workspace(request, state, error="This slot or demo request quota is unavailable.", status=409)
-    rows.append({"unit": unit, "slot": slot, "project": project, "status": "pending"})
-    return save_state(redirect("demo-student"), state)
+    row = new_row(unit, **form.cleaned_data)
+    if len(rows) >= MAX_REQUESTS or not feasible(row, rows):
+        return render_workspace(request, state,
+                                error="No feasible slot fits those requirements, or the demo request limit was reached.",
+                                status=409, bound_form=form, bound_unit=unit)
+    rows.append(row)
+    return save_state(state, "student")
 
 
 @never_cache
@@ -117,12 +135,15 @@ def decide(request, number):
         return HttpResponseForbidden("A faculty demo session is required.")
     rows = state["requests"]
     decision = request.POST.get("decision")
-    if decision not in ("approved", "rejected") or number >= len(rows):
-        return render_workspace(request, state, error="Select an existing request and decision.", status=400)
+    if decision not in ("approved", "rejected", "reschedule requested") or number >= len(rows):
+        return HttpResponseBadRequest("Choose an existing request and decision.")
     row = rows[number]
     if row["status"] != "pending":
         return render_workspace(request, state, error="This request has already been decided.", status=409)
-    if decision == "approved" and slot_reserved(rows, row["unit"], row["slot"]):
-        return render_workspace(request, state, error="A simulated reservation already occupies this slot.", status=409)
+    if decision == "approved":
+        raw = request.POST.get("start", "")
+        if not raw.isascii() or not raw.isdecimal() or len(raw) > 4 or not can_approve(row, rows, int(raw)):
+            return render_workspace(request, state, error="This allocation conflicts with the booking constraints.", status=409)
+        row["allocated"] = int(raw)
     row["status"] = decision
-    return save_state(redirect("demo-faculty"), state)
+    return save_state(state, "faculty")

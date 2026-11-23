@@ -120,7 +120,7 @@ def candidates(request, resources, student, reservations, student_reservations, 
             if remainder:
                 start += STEP - remainder
             last_end = min(right, request["deadline"], request["latest_end"])
-            while start + length <= last_end:
+            while last_end - start >= length:
                 if respects_grid(start, resource):
                     options.append(Slot(resource_id, start, start + length))
                 start += STEP
@@ -136,13 +136,17 @@ def option_key(request, slot):
     )
 
 
-def score(request, slots, prior_usage, now):
+def score_components(request, slots, prior_usage, now):
     remaining = (request["deadline"] - now) // timedelta(seconds=1)
     urgency = max(0, 40 - 40 * remaining // (HORIZON_DAYS * 86400))
     scarcity = max(0, 26 - len(slots))
     fit = 20 if slots[0].resource_id == request["resource_id"] else 10
     fairness = max(0, 15 - prior_usage // 30)
-    return urgency + scarcity + fit + fairness
+    return {"urgency": urgency, "scarcity": scarcity, "fit": fit, "fairness": fairness}
+
+
+def score(request, slots, prior_usage, now):
+    return sum(score_components(request, slots, prior_usage, now).values())
 
 
 def overlaps(first, second):

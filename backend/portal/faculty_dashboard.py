@@ -1,5 +1,5 @@
 from .reporting import equipment_usage, report_period, reservation_state
-from .scheduling import approved_intervals, recommend, requested_slot_conflicts
+from .scheduling import approved_intervals, candidates, recommend, requested_slot_conflicts
 
 
 def faculty_snapshot(store, lab_ids, period_value, now):
@@ -13,7 +13,7 @@ def faculty_snapshot(store, lab_ids, period_value, now):
     requests_by_id = {item["id"]: item for item in requests}
     pending = [item for item in requests if item["status"] == "pending"]
     decisions = sorted(
-        (item for item in requests if item["status"] in {"approved", "rejected"}),
+        (item for item in requests if item["status"] in {"approved", "rejected", "reschedule requested"}),
         key=lambda item: (item["decided_at"], item["id"]),
         reverse=True,
     )
@@ -67,18 +67,23 @@ def describe_recommendation(result, item, resources, reservations, students, his
         item, resources.get(preferred), students.get(uid), reservations.get(preferred, []),
         approved_intervals(histories[uid]), now=now,
     )
-    options = [
-        {
+    def describe_slot(slot):
+        resource = resources[slot.resource_id]
+        return {
             "value": f"{slot.resource_id}|{slot.starts_at.isoformat()}",
             "resource_id": slot.resource_id,
-            "name": resources[slot.resource_id]["name"],
+            "name": resource["name"],
             "starts_at": slot.starts_at,
             "ends_at": slot.ends_at,
-            "time_zone": resources[slot.resource_id]["time_zone"],
+            "time_zone": resource["time_zone"],
             "alternative": slot.resource_id != preferred or slot.starts_at != item["starts_at"],
         }
-        for slot in result.slots
-    ]
+
+    options = [describe_slot(slot) for slot in result.slots]
+    other_slots = candidates(
+        item, list(resources.values()), students.get(uid), reservations, approved_intervals(histories[uid]), now,
+    )
+    overrides = [describe_slot(slot) for slot in other_slots if slot not in result.slots][:12]
     if not reasons and (not options or options[0]["alternative"]):
         reasons.append("A higher-priority recommendation uses the requested interval in this plan.")
-    return {"item": item, "score": result.score, "options": options, "conflicts": reasons}
+    return {"item": item, "score": result.score, "options": options, "overrides": overrides, "conflicts": reasons}

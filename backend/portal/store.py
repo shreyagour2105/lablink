@@ -8,7 +8,7 @@ from google.auth.credentials import AnonymousCredentials
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-from .scheduling import approved_intervals, equipment_capabilities, slot_is_feasible
+from .scheduling import approved_intervals, candidates, equipment_capabilities, slot_is_feasible
 
 
 class BookingConflict(Exception):
@@ -112,7 +112,7 @@ class Store:
             }
             reservations = self.upcoming_reservations(slug, now=now, transaction=transaction)
             personal = approved_intervals(self.history(uid, transaction=transaction))
-            if not slot_is_feasible(item, resource, account, start, reservations, personal, now):
+            if not candidates(item, [resource], account, {slug: reservations}, personal, now):
                 raise BookingConflict("That slot is unavailable or you are ineligible. Check the hours, deadline, and your reservations.")
             transaction.create(request_ref, {
                 **item,
@@ -125,10 +125,10 @@ class Store:
         return request_ref.id
 
     def decide(self, uid, request_id, decision, reason, slot=None):
-        if decision not in {"approved", "rejected"}:
+        if decision not in {"approved", "rejected", "reschedule requested"}:
             raise ValueError("Unsupported booking decision.")
-        if decision == "rejected" and not reason.strip():
-            raise ValueError("A rejection requires a reason.")
+        if decision in {"rejected", "reschedule requested"} and not reason.strip():
+            raise ValueError("A rejection or reschedule request requires a reason.")
         request_ref = self.collection("booking_requests").document(request_id)
         account_ref = self.collection("accounts").document(uid)
 

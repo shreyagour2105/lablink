@@ -20,7 +20,7 @@ from .faculty_dashboard import faculty_snapshot
 from .forms import BookingForm, DecisionForm
 from .gemini import explain
 from .reporting import REPORT_PERIODS
-from .scheduling import eligible
+from .scheduling import approved_intervals, candidates, eligible, requested_slot_conflicts
 from .store import BookingConflict, RequestNotFound, get_store
 
 
@@ -192,8 +192,21 @@ def resource_detail(request, account, slug):
 def student_history(request, account):
     if account["role"] != "student":
         return error_page(request, 403, "Student access required", "Student histories are private to each student.")
-    items = get_store().history(account["id"])
+    store = get_store()
+    items = store.history(account["id"])
     reservations = [item for item in items if item.get("reservation_id")]
+    personal = approved_intervals(items)
+    now = timezone.now()
+    availability = {}
+    pending = [item for item in items if item["status"] == "pending"][:10]
+    for item in pending:
+        slug = item["resource_id"]
+        if slug not in availability:
+            availability[slug] = (store.resource(slug), store.upcoming_reservations(slug, now=now))
+        unit, booked = availability[slug]
+        item["conflicts"] = requested_slot_conflicts(item, unit, account, booked, personal, now=now)
+        item["suggestions"] = candidates(item, [unit] if unit else [], account, {slug: booked}, personal, now)[:3]
+        item["show_suggestions"] = True
     return render(request, "history.html", {"account": account, "items": items, "reservations": reservations})
 
 
@@ -242,7 +255,11 @@ def faculty_decision(request, account, request_id):
         raise Http404 from error
     except BookingConflict as error:
         return render_faculty(request, account, status=409, decision_error=str(error))
-    outcome = "Request approved and reservation created." if form.cleaned_data["decision"] == "approved" else "Request rejected and reason recorded."
+    outcome = {
+        "approved": "Request approved and reservation created.",
+        "rejected": "Request rejected and reason recorded.",
+        "reschedule requested": "Rescheduling requested and reason recorded.",
+    }[form.cleaned_data["decision"]]
     messages.success(request, outcome)
     location = reverse("faculty")
     return redirect(f"{location}?days=30" if request.GET.get("days") == "30" else location)

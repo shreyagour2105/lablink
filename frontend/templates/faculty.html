@@ -49,25 +49,37 @@
             {% endif %}
             <form method="post" action="{% url 'faculty-decision' item.id %}?days={{ period.days }}" data-faculty-form data-decision-form>
               {% csrf_token %}
-              {% if entry.options %}
+              {% if entry.options or entry.overrides %}
                 <div>
                   <label for="slot-{{ item.id }}">Recommended slots</label>
                   <select id="slot-{{ item.id }}" name="slot">
+                    {% if entry.options %}<optgroup label="Recommended slots">{% endif %}
                     {% for option in entry.options %}
                       {% timezone option.time_zone %}
                         <option value="{{ option.value }}">{% if option.alternative %}Alternative{% else %}Requested{% endif %} · {{ option.name }} · {{ option.starts_at|date:"M j H:i" }}–{{ option.ends_at|date:"H:i" }} · {{ option.time_zone }}</option>
                       {% endtimezone %}
                     {% endfor %}
+                    {% if entry.options %}</optgroup>{% endif %}
+                    {% if entry.overrides %}
+                      <optgroup label="Feasible overrides — may change pending recommendations">
+                        {% for option in entry.overrides %}
+                          {% timezone option.time_zone %}
+                            <option value="{{ option.value }}">{{ option.name }} · {{ option.starts_at|date:"M j H:i" }}–{{ option.ends_at|date:"H:i" }} · {{ option.time_zone }}</option>
+                          {% endtimezone %}
+                        {% endfor %}
+                      </optgroup>
+                    {% endif %}
                   </select>
                 </div>
               {% endif %}
               <div>
-                <label for="reason-{{ item.id }}">Decision note (required to reject)</label>
+                <label for="reason-{{ item.id }}">Decision note (required to reject or request rescheduling)</label>
                 <textarea id="reason-{{ item.id }}" name="reason" rows="2" maxlength="500"></textarea>
               </div>
               <div class="actions">
-                {% if entry.options %}<button class="button" type="submit" name="decision" value="approved">Approve selected slot</button>{% endif %}
+                {% if entry.options or entry.overrides %}<button class="button" type="submit" name="decision" value="approved">Approve selected slot</button>{% endif %}
                 <button class="button button-outline" type="submit" name="decision" value="rejected">Reject</button>
+                <button class="button button-outline" type="submit" name="decision" value="reschedule requested">Request rescheduling</button>
               </div>
               <p class="visually-hidden" data-loading-status role="status"></p>
             </form>

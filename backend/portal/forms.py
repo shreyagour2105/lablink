@@ -85,7 +85,7 @@ class BookingForm(forms.Form):
 
 
 class DecisionForm(forms.Form):
-    decision = forms.ChoiceField(choices=[("approved", "Approve"), ("rejected", "Reject")])
+    decision = forms.ChoiceField(choices=[("approved", "Approve"), ("rejected", "Reject"), ("reschedule requested", "Request rescheduling")])
     reason = forms.CharField(max_length=500, required=False)
     slot = forms.CharField(max_length=150, required=False)
 
@@ -108,4 +108,6 @@ class DecisionForm(forms.Form):
         data = super().clean()
         if data.get("decision") == "rejected" and not data.get("reason"):
             self.add_error("reason", "Enter a reason for rejecting the request.")
+        if data.get("decision") == "reschedule requested" and not data.get("reason"):
+            self.add_error("reason", "Explain what the student should reschedule.")
         return data

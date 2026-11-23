@@ -47,13 +47,14 @@ if (dialog?.showModal && title && description && confirmButton) {
     event.preventDefault();
     pending = { form, button };
     const approving = button.value === "approved";
+    const rescheduling = button.value === "reschedule requested";
     const slot = form.querySelector<HTMLSelectElement>("select[name=slot]")?.selectedOptions[0];
     const slotLabel = slot?.textContent?.trim().replace(/^(Requested|Alternative) · /, "");
-    title.textContent = approving ? "Approve this request?" : "Reject this request?";
+    title.textContent = approving ? "Approve this request?" : rescheduling ? "Request rescheduling?" : "Reject this request?";
     description.textContent = approving && slotLabel
       ? `Reserve ${slotLabel} if it is still available.`
-      : "The rejection reason will be visible to the student.";
-    confirmButton.textContent = approving ? "Confirm approval" : "Confirm rejection";
+      : "Your decision note will be visible to the student.";
+    confirmButton.textContent = approving ? "Confirm approval" : rescheduling ? "Confirm rescheduling" : "Confirm rejection";
     dialog.returnValue = "";
     dialog.showModal();
     dialog.querySelector<HTMLElement>("[autofocus]")?.focus();

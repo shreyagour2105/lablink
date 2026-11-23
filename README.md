@@ -123,6 +123,8 @@ The Vercel adapter also accepts the exact deployment and production hostnames fr
 
 ## Public demo mode
 
-Open the landing page and choose **Open LabLink demo**, then enter as Student or Faculty. The demo uses fictional equipment, preset projects, and a signed browser cookie with an eight-hour expiry. Switch roles in the same browser to see your simulated requests and decisions. There is no shared inventory or booking state between browsers. Use a fresh browser profile to start again.
+Open the landing page and choose **Try Demo**, then enter as Student or Faculty. The demo uses fictional equipment, sample project requests, and a signed browser cookie with an eight-hour expiry. Switch roles in the same browser to see your simulated requests and decisions. There is no shared inventory or booking state between browsers. Use a fresh browser profile to start again.
 
 Demo routes use no Firebase services and never grant access to real accounts. The existing campus sign-in remains available at `/sign-in/`. Vercel still needs `DJANGO_SECRET_KEY` for Django and demo cookie signing.
+
+The demo opens on a fixed fictional schedule. Two printer projects compete for 09:00. One has a tight deadline and fewer feasible starts. The other has more flexibility and a prior booking in the scenario. The deterministic planner suggests non-overlapping allocations and shows the scoring inputs. Faculty can select another feasible slot, reject a request, or request rescheduling. The demo-day utilisation table counts only confirmed demo-day intervals. Browser-scoped simulation state is independent of Firebase.

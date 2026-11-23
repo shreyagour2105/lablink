@@ -202,6 +202,34 @@ class EmulatorBookingTests(SimpleTestCase):
         self.assertRedirects(self.post(student, reverse("sign-out"), {}), reverse("home"))
         self.assertRedirects(student.get(reverse("student-history")), reverse("sign-in"), fetch_redirect_response=False)
 
+    def test_flexible_request_gets_alternative_and_reschedule_decision(self):
+        slug = "flexible-reschedule-equipment"
+        self.store.collection("equipment").document(slug).set(RESOURCE)
+        reserved_uid = self.create_user("student")[0]
+        visitor = self.create_user("student")
+        request_id = self.store.submit(reserved_uid, slug, {
+            **INPUTS, "starts_at": START, "deadline": DEADLINE,
+        })
+        self.store.decide(self.faculty[0], request_id, "approved", "")
+        student = self.sign_in(visitor)
+        faculty = self.sign_in(self.faculty, expected="faculty")
+        booking = self.post(student, reverse("resource-detail", args=[slug]), {
+            **INPUTS, "earliest_start": INPUTS["starts_at"], "latest_end": INPUTS["deadline"],
+        })
+        self.assertRedirects(booking, reverse("student-history"))
+        history = student.get(reverse("student-history"))
+        self.assertContains(history, "Another confirmed reservation overlaps")
+        self.assertContains(history, "11:00")
+        pending = self.store.history(visitor[0])[0]
+        decision_url = reverse("faculty-decision", args=[pending["id"]])
+        self.assertEqual(self.post(faculty, decision_url, {"decision": "reschedule requested"}).status_code, 400)
+        decision = self.post(faculty, decision_url, {
+            "decision": "reschedule requested", "reason": "Please extend the acceptable window.",
+        })
+        self.assertRedirects(decision, reverse("faculty"))
+        self.assertContains(student.get(reverse("student-history")), "Submit a revised request")
+        self.assertEqual(len(self.store.upcoming_reservations(slug, now=NOW)), 1)
+
     def test_concurrent_approval_creates_one_reservation(self):
         resource = {**RESOURCE, "name": "Second sample spectrometer"}
         slug = "concurrent-spectrometer"
