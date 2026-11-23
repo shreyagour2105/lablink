@@ -1,3 +1,4 @@
+import logging
 import time
 from datetime import timedelta
 from functools import wraps
@@ -21,6 +22,9 @@ from .gemini import explain
 from .reporting import REPORT_PERIODS
 from .scheduling import eligible
 from .store import BookingConflict, RequestNotFound, get_store
+
+
+logger = logging.getLogger(__name__)
 
 
 def error_page(request, status, title, message):
@@ -77,18 +81,27 @@ def create_session(request):
     if not token or len(token) > 8192:
         return JsonResponse({"error": "A valid sign-in token is required."}, status=400)
 
+    stage = "verify_id_token"
     try:
         identity = firebase_auth.verify_id_token(token)
         auth_age = time.time() - identity.get("auth_time", 0)
         if not -30 <= auth_age <= 300:
             return JsonResponse({"error": "Sign in again to continue."}, status=401)
+        stage = "firestore_account_lookup"
         account = get_store().account(identity["uid"])
         if not account or account.get("role") not in {"student", "faculty"}:
             return JsonResponse({"error": "Your account has not been provisioned for LabLink."}, status=403)
+        stage = "create_session_cookie"
         cookie = firebase_auth.create_cookie(token, timedelta(seconds=settings.AUTH_COOKIE_AGE))
     except firebase_auth.InvalidCredential:
         return JsonResponse({"error": "Sign-in could not be verified."}, status=401)
-    except (firebase_auth.AuthUnavailable, GoogleAPICallError, DefaultCredentialsError):
+    except (firebase_auth.AuthUnavailable, GoogleAPICallError, DefaultCredentialsError) as error:
+        cause = error.__cause__ if isinstance(error, firebase_auth.AuthUnavailable) else error
+        logger.warning(
+            "LabLink sign-in dependency unavailable stage=%s error_type=%s",
+            stage,
+            type(cause or error).__name__,
+        )
         return JsonResponse({"error": "Sign-in is temporarily unavailable."}, status=503)
 
     response = JsonResponse({"role": account["role"]})
