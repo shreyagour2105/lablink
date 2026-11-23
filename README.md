@@ -2,6 +2,10 @@
 
 LabLink is a campus equipment catalog and project booking workflow. Its demo seed contains three **sample** records for fictional departments and labs. Students browse current availability and submit requests. Assigned faculty can approve a request to reserve the selected interval or reject it with a reason.
 
+## Architecture
+
+Django serves the pages and handles booking decisions. TypeScript handles browser sign-in through Firebase Authentication. The browser exchanges its Firebase ID token for a secure session with Django. The server reads roles, lab assignments, requests and reservations from Firestore. The scheduler computes recommendations before approval, and the approval transaction checks the selected slot against the current records.
+
 ## Local development
 
 Install Python 3.12, Node.js 24, and JDK 21. Run the commands below from the repository root.
@@ -64,6 +68,13 @@ Firestore stores equipment operating windows and closures, project requests, and
 ## Cloud Run
 
 The Dockerfile builds the frontend assets and serves Django with Gunicorn on `PORT`. Use a real Firebase project with Email/Password enabled and a Firestore database. Deploy `firestore.rules`, configure the Firebase project ID and public web API key, and grant the Cloud Run service account the Firestore and Firebase Auth permissions required to read and write bookings, read users, and issue session cookies. Use Application Default Credentials and provision users through Firebase and the management command. Keep `DJANGO_DEBUG=false`, omit emulator variables, set `DJANGO_ALLOWED_HOSTS` to the deployed hostname, set `DJANGO_BEHIND_PROXY=true` behind Cloud Run ingress, and inject `DJANGO_SECRET_KEY` from Secret Manager. No service-account key belongs in the image or repository.
+
+### Deployment verification
+
+1. In the deployment project, enable Firebase Authentication with the Email/Password provider, create the default Firestore database in Native mode, and deploy the checked-in Firestore rules. Provision the Cloud Run runtime identity with the required Firebase Auth and Firestore permissions. Add the Django signing key to Secret Manager and grant the runtime identity access to that secret.
+2. Build the repository Dockerfile and publish the image to Artifact Registry. Deploy it to Cloud Run using the runtime identity. Configure `FIREBASE_PROJECT_ID` and the Firebase Web API key for the same Firebase project. Set `DJANGO_ALLOWED_HOSTS` to the exact hostname of the Cloud Run service URL, without the scheme. Enable public HTTP access to the service after its production settings are in place.
+3. Keep the default TCP startup probe on the container port. Smoke-test the public HTTPS landing page and the hashed frontend asset on the sign-in page. Django serves the pages and booking endpoints from the same origin, so these routes need no cross-origin CORS settings. Keep CSRF protection on for form submissions.
+4. Seed the sample catalogue and create separate student and faculty test identities in the deployment Firebase project. Run the provisioning commands with production credentials, then verify that a student can request equipment and see the reservation after assigned faculty approve it. Verify that a competing approval is rejected when it overlaps a confirmed booking.
 
 ## Scheduling policy
 
