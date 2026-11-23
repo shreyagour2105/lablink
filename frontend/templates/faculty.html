@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% load static tz %}
+{% block title %}Faculty dashboard | LabLink{% endblock %}
+{% block head %}<script type="module" src="{% static 'faculty.js' %}"></script>{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <h1>Faculty dashboard</h1>
+  {% if labs %}
+    <p>Assigned labs: {% for lab in labs %}{{ lab.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+    <nav class="section-nav" aria-label="Faculty dashboard sections">
+      <a href="#pending">Requests</a>
+      <a href="#reservations">Reservations</a>
+      <a href="#utilisation">Utilisation</a>
+      <a href="#decisions">Decision history</a>
+    </nav>
+  {% else %}
+    <p>Your account has no lab assignments. Contact your campus administrator to request access.</p>
+  {% endif %}
+  {% if decision_error %}<div class="notice notice-error" role="alert">{{ decision_error }}</div>{% endif %}
+  {% for message in messages %}<div class="notice notice-success" role="status">{{ message }}</div>{% endfor %}
+
+  {% if labs %}
+    <section class="section-space" id="pending" aria-labelledby="pending-title">
+      <h2 id="pending-title">Pending requests</h2>
+      {% for entry in queue %}
+        {% with item=entry.item %}
+          <article class="booking-form panel faculty-request" id="request-{{ item.id }}">
+            <h3>{{ item.project_title }}</h3>
+            <p>{{ item.resource_name }} · {{ item.duration_minutes }} minutes</p>
+            <p class="request-purpose">{{ item.purpose }}</p>
+            {% timezone item.time_zone %}
+              <dl class="decision-facts">
+                <div><dt>Requested start</dt><dd>{{ item.starts_at|date:"M j, Y H:i" }}</dd></div>
+                <div><dt>Project deadline</dt><dd>{{ item.deadline|date:"M j, Y H:i" }}</dd></div>
+                <div><dt>Time zone</dt><dd>{{ item.time_zone }}</dd></div>
+              </dl>
+            {% endtimezone %}
+            {% if item.required_capabilities %}<p>Required: {{ item.required_capabilities|join:", " }}</p>{% endif %}
+            {% if entry.conflicts %}
+              <div class="conflict-details">
+                <h4>Requested slot conflicts</h4>
+                <ul>{% for conflict in entry.conflicts %}<li>{{ conflict }}</li>{% endfor %}</ul>
+              </div>
+            {% endif %}
+            {% if entry.options %}
+              <p>Scheduling score {{ entry.score }}. Availability is checked again on approval.</p>
+            {% else %}
+              <p>No feasible recommendation for this request in the current plan.</p>
+            {% endif %}
+            <form method="post" action="{% url 'faculty-decision' item.id %}?days={{ period.days }}" data-faculty-form data-decision-form>
+              {% csrf_token %}
+              {% if entry.options %}
+                <div>
+                  <label for="slot-{{ item.id }}">Recommended slots</label>
+                  <select id="slot-{{ item.id }}" name="slot">
+                    {% for option in entry.options %}
+                      {% timezone option.time_zone %}
+                        <option value="{{ option.value }}">{% if option.alternative %}Alternative{% else %}Requested{% endif %} · {{ option.name }} · {{ option.starts_at|date:"M j H:i" }}–{{ option.ends_at|date:"H:i" }} · {{ option.time_zone }}</option>
+                      {% endtimezone %}
+                    {% endfor %}
+                  </select>
+                </div>
+              {% endif %}
+              <div>
+                <label for="reason-{{ item.id }}">Decision note (required to reject)</label>
+                <textarea id="reason-{{ item.id }}" name="reason" rows="2" maxlength="500"></textarea>
+              </div>
+              <div class="actions">
+                {% if entry.options %}<button class="button" type="submit" name="decision" value="approved">Approve selected slot</button>{% endif %}
+                <button class="button button-outline" type="submit" name="decision" value="rejected">Reject</button>
+              </div>
+              <p class="visually-hidden" data-loading-status role="status"></p>
+            </form>
+            {% if entry.options %}
+              <form method="post" action="{% url 'faculty-explanation' item.id %}?days={{ period.days }}#request-{{ item.id }}" data-faculty-form data-loading-message="Preparing explanation…">
+                {% csrf_token %}
+                <button class="button button-outline" type="submit">Explain first recommendation</button>
+                <p class="visually-hidden" data-loading-status role="status"></p>
+              </form>
+            {% endif %}
+            {% if entry.explanation %}
+              <div class="conflict-details">
+                <h4>Recommendation explanation</h4>
+                <p>{{ entry.explanation.summary }}</p>
+                {% if entry.explanation.points %}
+                  <ul>{% for point in entry.explanation.points %}<li>{{ point }}</li>{% endfor %}</ul>
+                  <p class="cell-detail">{% if entry.explanation.used_gemini %}Gemini selected the highlights.{% else %}Rules-based explanation.{% endif %}</p>
+                {% endif %}
+              </div>
+            {% endif %}
+          </article>
+        {% endwith %}
+      {% empty %}
+        <p>No pending requests for your assigned labs.</p>
+      {% endfor %}
+    </section>
+
+    <section class="section-space" id="reservations" aria-labelledby="reservations-title">
+      <h2 id="reservations-title">Reservation states</h2>
+      <p>Upcoming and in-progress reservations, plus those that ended in the past {{ period.days }} days. States follow the scheduled times.</p>
+      {% if reservations %}
+        <div class="panel">
+          <table>
+            <thead><tr><th scope="col">Equipment and project</th><th scope="col">Scheduled interval</th><th scope="col">State</th></tr></thead>
+            <tbody>
+              {% for row in reservations %}
+                {% timezone row.unit.time_zone %}
+                  <tr>
+                    <td>{{ row.unit.name }}<span class="cell-detail">{{ row.project }} · {{ row.unit.lab_name }}</span></td>
+                    <td>{{ row.starts_at|date:"M j, Y H:i" }}<span class="cell-detail">to {{ row.ends_at|date:"M j, Y H:i" }} · {{ row.unit.time_zone }}</span></td>
+                    <td><span class="status-pill" data-state="{{ row.state|slugify }}">{{ row.state }}</span></td>
+                  </tr>
+                {% endtimezone %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}<p>No reservations in this view.</p>{% endif %}
+    </section>
+
+    <section class="section-space" id="utilisation" aria-labelledby="utilisation-title">
+      <h2 id="utilisation-title">Equipment utilisation</h2>
+      <p>Booked utilisation is confirmed time divided by scheduled capacity after closures. It measures reservations rather than physical usage.</p>
+      <form class="filters panel" action="{% url 'faculty' %}#utilisation" method="get" data-faculty-form data-loading-message="Loading utilisation…">
+        <div>
+          <label for="period">Reporting period</label>
+          <select id="period" name="days">
+            {% for days in period_choices %}
+              <option value="{{ days }}"{% if period.days == days %} selected{% endif %}>Past {{ days }} days</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button class="button button-outline" type="submit">Apply period</button>
+        <p class="visually-hidden" data-loading-status role="status"></p>
+      </form>
+      {% timezone "UTC" %}
+        <p class="report-dates">Past {{ period.days }} days · {{ period.start|date:"M j, Y H:i" }} to {{ period.end|date:"M j, Y H:i" }} UTC</p>
+      {% endtimezone %}
+      {% if usage %}
+        <div class="panel table-scroll" role="region" aria-label="Equipment utilisation table" tabindex="0">
+          <table>
+            <thead><tr><th scope="col">Equipment</th><th scope="col" class="numeric">Booked hours</th><th scope="col" class="numeric">Available hours</th><th scope="col" class="numeric">Booked utilisation</th></tr></thead>
+            <tbody>
+              {% for row in usage %}
+                <tr>
+                  <td>{{ row.unit.name }}<span class="cell-detail">{{ row.unit.lab_name }}{% if not row.unit.active %} · Inactive{% endif %}</span></td>
+                  <td class="numeric">{{ row.booked_hours|floatformat:2 }}</td>
+                  <td class="numeric">{{ row.available_hours|floatformat:2 }}</td>
+                  <td class="numeric">{% if row.percent is None %}No capacity{% else %}{{ row.percent|floatformat:1 }}%{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}<p>No equipment is recorded for your assigned labs.</p>{% endif %}
+    </section>
+
+    <section class="section-space" id="decisions" aria-labelledby="decisions-title">
+      <h2 id="decisions-title">Decision history</h2>
+      {% if decisions %}
+        <div class="panel">
+          <table>
+            <thead><tr><th scope="col">Project</th><th scope="col">Decision</th><th scope="col">Decision note</th></tr></thead>
+            <tbody>
+              {% for item in decisions %}
+                {% timezone item.time_zone %}
+                  <tr>
+                    <td>{{ item.project_title }}<span class="cell-detail">{{ item.reserved_resource_name|default:item.resource_name }}</span></td>
+                    <td><span class="status-pill" data-state="{{ item.status }}">{{ item.status|capfirst }}</span><span class="cell-detail">{{ item.decided_at|date:"M j, Y H:i" }} · {{ item.time_zone }}</span></td>
+                    <td>{{ item.decision_reason|default:"No note" }}</td>
+                  </tr>
+                {% endtimezone %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}<p>No decisions have been recorded for your assigned labs.</p>{% endif %}
+    </section>
+  {% endif %}
+</div>
+<dialog class="confirm-dialog" aria-labelledby="decision-title" aria-describedby="decision-description" id="decision-dialog">
+  <form method="dialog">
+    <h2 id="decision-title">Confirm decision</h2>
+    <p id="decision-description"></p>
+    <div class="actions">
+      <button type="submit" class="button button-outline" value="cancel" autofocus>Go back</button>
+      <button type="submit" class="button" value="confirm" id="confirm-decision">Confirm decision</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

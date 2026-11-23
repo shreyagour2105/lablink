@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load tz %}
+{% block title %}My bookings | LabLink{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <h1>My bookings</h1>
+  <section class="section-space" aria-labelledby="requests-title">
+    <h2 id="requests-title">Project requests</h2>
+    {% if items %}
+      <div class="panel">
+        <table>
+          <thead><tr><th scope="col">Project</th><th scope="col">Requested time</th><th scope="col">Status</th></tr></thead>
+          <tbody>
+            {% for item in items %}
+              {% timezone item.time_zone %}
+                <tr>
+                  <td>{{ item.project_title }}<span class="cell-detail">{{ item.resource_name }}</span></td>
+                  <td>{{ item.starts_at|date:"M j, Y H:i" }}<span class="cell-detail">{{ item.duration_minutes }} min · {{ item.time_zone }}</span><span class="cell-detail">Deadline {{ item.deadline|date:"M j, Y H:i" }}</span></td>
+                  <td><span class="status-pill" data-state="{{ item.status }}">{{ item.status|capfirst }}</span>{% if item.decision_reason %}<span class="cell-detail">{{ item.decision_reason }}</span>{% endif %}</td>
+                </tr>
+              {% endtimezone %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}<p>You haven’t requested any equipment yet.</p>{% endif %}
+  </section>
+  <section class="section-space" aria-labelledby="reservations-title">
+    <h2 id="reservations-title">Reservation history</h2>
+    {% if reservations %}
+      <div class="panel">
+        <table>
+          <thead><tr><th scope="col">Equipment</th><th scope="col">Reserved interval</th></tr></thead>
+          <tbody>
+            {% for item in reservations %}
+              {% with zone=item.reserved_time_zone|default:item.time_zone %}
+                {% timezone zone %}
+                  <tr><td>{{ item.reserved_resource_name|default:item.resource_name }}<span class="cell-detail">{{ item.project_title }}</span></td><td>{{ item.reserved_start|default:item.starts_at|date:"M j, Y H:i" }}–{{ item.reserved_end|default:item.ends_at|date:"H:i" }}<span class="cell-detail">{{ zone }}</span></td></tr>
+                {% endtimezone %}
+              {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}<p>You don’t have any reservations yet.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

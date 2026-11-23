@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Equipment | LabLink{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <h1>Equipment catalog</h1>
+  <p>Find an equipment unit and check its upcoming availability. Equipment marked Demo sample is illustrative inventory.</p>
+  <form class="filters panel" method="get">
+    <div>
+      <label for="q">Search equipment</label>
+      <input type="search" id="q" name="q" value="{{ query }}" placeholder="Name, capability, or lab" maxlength="100">
+    </div>
+    <div>
+      <label for="department">Department</label>
+      <select id="department" name="department">
+        <option value="">All departments</option>
+        {% for item in departments %}
+          <option value="{{ item }}"{% if item == department %} selected{% endif %}>{{ item }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="button" type="submit">{% include "icon.html" with name="search" %} Search</button>
+    {% if query or department %}<a href="{% url 'catalog' %}">Clear filters</a>{% endif %}
+  </form>
+  {% if units %}
+    <div class="panel">
+      <table>
+        <caption class="visually-hidden">Matching equipment</caption>
+        <thead><tr><th scope="col">Equipment</th><th scope="col">Capability</th><th scope="col">Lab</th></tr></thead>
+        <tbody>
+        {% for unit in units %}
+          <tr>
+            <td><a href="{% url 'resource-detail' unit.id %}">{{ unit.name }}</a>{% if unit.sample %}<span class="cell-detail">Demo sample</span>{% endif %}</td>
+            <td>{{ unit.capability }}</td>
+            <td>{{ unit.lab_name }}<span class="cell-detail">{{ unit.department }}</span></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>No equipment matches your search.</p>
+  {% endif %}
+</div>
+{% endblock %}

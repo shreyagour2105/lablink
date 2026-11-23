@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+if [[ ! -f frontend/dist/app.js || ! -f frontend/dist/faculty.js ]]; then
+  npm run build
+fi
+exec "${PYTHON:-.venv/bin/python}" backend/manage.py runserver "${1:-127.0.0.1:8000}"

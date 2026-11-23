@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}LabLink | Campus laboratory access{% endblock %}
+{% block body_class %}landing{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="wrap hero-inner">
+    <div>
+      <p class="eyebrow">Campus laboratory access</p>
+      <h1>Find the lab equipment your project needs.</h1>
+      <p class="hero-copy">Find equipment across departments, check lab hours, and request time for your project.</p>
+      <a class="button button-ember" href="{% url 'dashboard' %}">Open LabLink {% include "icon.html" with name="arrow" %}</a>
+    </div>
+    <aside class="access-index" aria-label="Who can use LabLink">
+      <div class="access-row">
+        {% include "icon.html" with name="equipment" %}
+        <div><h2>Students</h2><p>Browse equipment, submit a project request, and track its approval.</p></div>
+      </div>
+      <div class="access-row">
+        {% include "icon.html" with name="review" %}
+        <div><h2>Faculty</h2><p>Review requests, compare feasible slots, and manage approvals for your labs.</p></div>
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

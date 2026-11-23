@@ -1,0 +1,10 @@
+.git
+.venv
+.env*
+node_modules
+frontend/dist
+staticfiles
+**/__pycache__
+*-service-account.json
+.firebase
+*-debug.log*

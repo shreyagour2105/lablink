@@ -1,0 +1,36 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}LabLink{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'lablink.css' %}">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="{% url 'home' %}"><span class="brand-mark" aria-hidden="true"></span>LabLink</a>
+      <nav aria-label="Main navigation">
+        {% if account %}
+          <a href="{% url 'catalog' %}"{% if request.resolver_match.url_name == "catalog" or request.resolver_match.url_name == "resource-detail" %} aria-current="{% if request.resolver_match.url_name == "catalog" %}page{% else %}true{% endif %}"{% endif %}>Equipment</a>
+          {% if account.role == 'faculty' %}
+            <a href="{% url 'faculty' %}"{% if request.resolver_match.url_name == "faculty" %} aria-current="page"{% endif %}>Faculty</a>
+          {% else %}
+            <a href="{% url 'student-history' %}"{% if request.resolver_match.url_name == "student-history" %} aria-current="page"{% endif %}>My bookings</a>
+          {% endif %}
+          <form method="post" action="{% url 'sign-out' %}">
+            {% csrf_token %}
+            <button class="text-button" type="submit">Sign out</button>
+          </form>
+        {% else %}
+          <a href="{% url 'sign-in' %}"{% if request.resolver_match.url_name == "sign-in" %} aria-current="page"{% endif %}>Sign in</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+  <main id="main" tabindex="-1">{% block content %}{% endblock %}</main>
+</body>
+</html>

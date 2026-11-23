@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Sign in | LabLink{% endblock %}
+{% block head %}{% if ready %}<script type="module" src="{% static 'app.js' %}"></script>{% endif %}{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <section class="panel sign-in-panel" aria-labelledby="sign-in-heading">
+    <h1 id="sign-in-heading">Sign in to LabLink</h1>
+    {% if ready %}
+      <p>Use the account provisioned by your campus administrator.</p>
+      <form id="sign-in" method="post" action="{% url 'create-session' %}" data-dashboard="{% url 'dashboard' %}">
+        {% csrf_token %}
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="username" required>
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+        <button class="button" type="submit" disabled>Sign in</button>
+        <p class="status" id="sign-in-status" role="status"></p>
+      </form>
+      <noscript>Enable JavaScript to sign in.</noscript>
+      {{ firebase_config|json_script:"firebase-config" }}
+    {% else %}
+      <p>Sign-in configuration is missing. Contact your LabLink administrator.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

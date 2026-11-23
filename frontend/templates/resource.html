@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load tz %}
+{% block title %}{{ resource.name }} | LabLink{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <a class="back-link" href="{% url 'catalog' %}">Back to equipment</a>
+  <h1>{{ resource.name }}</h1>
+  <p>{{ resource.description }}{% if resource.sample %} This is demo sample equipment.{% endif %}</p>
+  <dl class="facts">
+    <div><dt>Capability</dt><dd>{{ resource.capability }}</dd></div>
+    <div><dt>Lab</dt><dd>{{ resource.lab_name }}, {{ resource.department }}</dd></div>
+    <div><dt>Location</dt><dd>{{ resource.location }}</dd></div>
+  </dl>
+  <section aria-labelledby="availability-heading">
+    <h2 id="availability-heading">Upcoming availability</h2>
+    <p>Upcoming operating hours, excluding closures and approved reservations. Times shown in {{ resource.time_zone }}.</p>
+    {% if availability %}
+      <div class="panel">
+        {% timezone resource.time_zone %}
+        <table>
+          <caption class="visually-hidden">Available intervals</caption>
+          <thead><tr><th scope="col">Date</th><th scope="col">From</th><th scope="col">Until</th></tr></thead>
+          <tbody>
+            {% for start, end in availability %}
+              <tr>
+                <td><time datetime="{{ start|date:'c' }}">{{ start|date:"D, M j" }}</time></td>
+                <td>{{ start|date:"H:i" }}</td>
+                <td>{{ end|date:"H:i" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endtimezone %}
+      </div>
+    {% else %}
+      <p>No availability in the next seven calendar days.</p>
+    {% endif %}
+  </section>
+  {% if restricted %}<p class="section-space">Booking requires access to this lab. Contact your campus administrator.</p>{% endif %}
+  {% if form %}
+    <section class="booking-form panel" aria-labelledby="booking-title">
+      <h2 id="booking-title">Request this equipment</h2>
+      <p>Choose a time within an available interval. Enter all times in {{ resource.time_zone }}. Your request needs faculty approval before the slot is reserved.</p>
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_div }}
+        <button class="button" type="submit">Submit booking request</button>
+      </form>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}
