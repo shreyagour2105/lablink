@@ -118,3 +118,5 @@ Import this repository with project root `.`, Framework Preset **Other**, and No
 Configure `DJANGO_SECRET_KEY`, `DJANGO_DEBUG` (false), `DJANGO_BEHIND_PROXY` (true), `DJANGO_ALLOWED_HOSTS` (exact Vercel hostname), `FIREBASE_PROJECT_ID`, `FIREBASE_WEB_API_KEY`, and `LABLINK_GOOGLE_CREDENTIALS_JSON` in the Vercel project. The last variable is a sensitive server-only Google service-account credential for the target Firebase project. Keep it out of Git and grant only the required Firebase Auth and Firestore access. Omit emulator variables. `GEMINI_API_KEY` and `GEMINI_MODEL` are optional.
 
 Enable Email/Password sign-in and provision demo users and the default Firestore database in the real Firebase project. Deploy the Firestore rules and seed the sample catalogue before checking student and faculty flows on the live URL.
+
+The Vercel adapter also accepts the exact deployment and production hostnames from Vercel's system environment variables. Include any additional domains in `DJANGO_ALLOWED_HOSTS`.
