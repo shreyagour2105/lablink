@@ -9,7 +9,7 @@
   </nav>
   <dl class="student-metrics">
     {% for label, count in dashboard.metrics %}
-      <div class="panel student-metric">
+      <div class="panel student-metric" data-metric="{{ label|slugify }}">
         <dt>{{ label }}</dt>
         <dd>{{ count }}</dd>
       </div>
