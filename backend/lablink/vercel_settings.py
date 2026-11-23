@@ -15,6 +15,7 @@ MIDDLEWARE = [
 # Trust only the exact hostnames Vercel assigns to this project and deployment.
 ALLOWED_HOSTS = list(dict.fromkeys([
     *ALLOWED_HOSTS,  # noqa: F405
+    "shreyagour2105-lablink-yjmg-shreya-3f2c.vercel.app",
     *(hostname for name in ("VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_URL")
       if (hostname := _os.environ.get(name))),
 ]))
