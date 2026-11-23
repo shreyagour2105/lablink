@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npm ci",
-  "buildCommand": "npm run build && mkdir -p vercel-static/static && cp frontend/static/lablink.css frontend/dist/app.js frontend/dist/faculty.js vercel-static/static/",
+  "buildCommand": "node -e 'if (!process.env.DJANGO_SECRET_KEY?.trim()) { console.error(\"Set DJANGO_SECRET_KEY for the target Vercel environment before building LabLink.\"); process.exit(1); }' && npm run build && mkdir -p vercel-static/static && cp frontend/static/lablink.css frontend/dist/app.js frontend/dist/faculty.js vercel-static/static/",
   "outputDirectory": "vercel-static",
   "functions": {
     "api/index.py": {
