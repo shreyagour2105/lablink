@@ -7,6 +7,8 @@ from .availability import HORIZON_DAYS, available_windows, interval_is_available
 STEP = timedelta(minutes=15)
 AGING_THRESHOLD = timedelta(hours=48)
 USAGE_PERIOD = timedelta(days=7)
+LOOKAHEAD_REQUESTS = 8
+LOOKAHEAD_SLOTS = 24
 
 
 @dataclass(frozen=True)
@@ -21,6 +23,8 @@ class Recommendation:
     request_id: str
     slots: tuple[Slot, ...]
     score: int | None = None
+    packing_gain: int = 0
+    blocking_requests: tuple[str, ...] = ()
 
 
 def normalize_capabilities(values):
@@ -54,10 +58,14 @@ def matches(request, resource, student):
     )
 
 
+def allows_alternatives(request):
+    return request.get("earliest_start") is not None and request.get("latest_end") is not None
+
+
 def respects_request(request, slot, now):
     if slot.starts_at <= now or slot.ends_at > request["deadline"]:
         return False
-    if request.get("earliest_start") is None or request.get("latest_end") is None:
+    if not allows_alternatives(request):
         return slot.resource_id == request["resource_id"] and slot.starts_at == request["starts_at"]
     return request["earliest_start"] <= slot.starts_at and slot.ends_at <= request["latest_end"]
 
@@ -108,7 +116,7 @@ def candidates(request, resources, student, reservations, student_reservations, 
             continue
         resource_id = resource["id"]
         blocked = [*reservations.get(resource_id, []), *student_reservations]
-        if not request.get("earliest_start") or not request.get("latest_end"):
+        if not allows_alternatives(request):
             start = request["starts_at"]
             if slot_is_feasible(request, resource, student, start, reservations.get(resource_id, []), student_reservations, now):
                 options.append(Slot(resource_id, start, start + length))
@@ -153,6 +161,45 @@ def overlaps(first, second):
     return first.starts_at < second.ends_at and second.starts_at < first.ends_at
 
 
+def conflicts_with(slot, student_uid, allocation, other_uid):
+    return (student_uid == other_uid or slot.resource_id == allocation.resource_id) and overlaps(slot, allocation)
+
+
+def preferred_conflicts(request, peers):
+    """Find pending requests with overlapping preferred intervals."""
+    length = duration(request)
+    if not length:
+        return []
+    start = request["starts_at"]
+    return [
+        other for other in peers
+        if other["id"] != request["id"]
+        and (other["resource_id"] == request["resource_id"] or other["student_uid"] == request["student_uid"])
+        and (other_length := duration(other))
+        and other["starts_at"] < start + length
+        and start < other["starts_at"] + other_length
+    ]
+
+
+def keep_later_options(options, student_uid, later):
+    """Within the preferred shortlist, choose the slot that preserves the most later requests."""
+    if len(options) < 2 or not later:
+        return options, 0
+
+    def preserved(candidate):
+        return sum(
+            any(not conflicts_with(candidate, student_uid, option, other_uid) for option in peer_options)
+            for other_uid, peer_options in later
+        )
+
+    shortlist = options[:LOOKAHEAD_SLOTS]
+    counts = [preserved(slot) for slot in shortlist]
+    best = max(range(len(counts)), key=counts.__getitem__)
+    if best == 0:
+        return options, 0
+    return [options[best], *options[:best], *options[best + 1:]], counts[best] - counts[0]
+
+
 def recommend(requests, resources, students, reservations, histories, *, now, options_limit=3):
     """Rank once using the persisted snapshot, then propose non-overlapping primary slots."""
     usage = {uid: prior_minutes(history, now) for uid, history in histories.items()}
@@ -176,18 +223,35 @@ def recommend(requests, resources, students, reservations, histories, *, now, op
 
     allocations = []
     recommendations = []
-    for _, request, slots, points in sorted(ranked, key=lambda item: item[0]):
-        uid = request["student_uid"]
-        options = tuple(
+    ranked.sort(key=lambda item: item[0])
+
+    def remaining(slots, uid):
+        return [
             slot for slot in slots
-            if not any(
-                (uid == other_uid or slot.resource_id == primary.resource_id) and overlaps(slot, primary)
-                for other_uid, primary in allocations
-            )
-        )[:options_limit]
-        if options:
-            allocations.append((uid, options[0]))
-        recommendations.append(Recommendation(request["id"], options, points))
+            if not any(conflicts_with(slot, uid, primary, other_uid)
+                       for _, other_uid, primary in allocations)
+        ]
+
+    for index, (_, request, slots, points) in enumerate(ranked):
+        uid = request["student_uid"]
+        options = remaining(slots, uid)
+        later = []
+        if len(options) > 1:
+            for _, peer, peer_slots, _ in ranked[index + 1:index + 1 + LOOKAHEAD_REQUESTS]:
+                peer_uid = peer["student_uid"]
+                if feasible := remaining(peer_slots, peer_uid):
+                    later.append((peer_uid, feasible))
+        options, gain = keep_later_options(options, uid, later)
+        preferred = next((slot for slot in slots
+                          if slot.resource_id == request["resource_id"] and slot.starts_at == request["starts_at"]), None)
+        blocking = tuple(
+            other_id for other_id, other_uid, primary in allocations
+            if preferred and conflicts_with(preferred, uid, primary, other_uid)
+        )
+        visible = tuple(options[:options_limit])
+        if visible:
+            allocations.append((request["id"], uid, visible[0]))
+        recommendations.append(Recommendation(request["id"], visible, points, gain, blocking))
     return recommendations
 
 

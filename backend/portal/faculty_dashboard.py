@@ -1,5 +1,11 @@
+from itertools import islice
+
+from .availability import available_windows
 from .reporting import equipment_usage, report_period, reservation_state
-from .scheduling import approved_intervals, candidates, recommend, requested_slot_conflicts
+from .scheduling import (
+    approved_intervals, candidates, preferred_conflicts, prior_minutes, recommend,
+    requested_slot_conflicts, score_components,
+)
 
 
 def faculty_snapshot(store, lab_ids, period_value, now):
@@ -21,9 +27,13 @@ def faculty_snapshot(store, lab_ids, period_value, now):
     reservations = {}
     usage = []
     states = []
+    schedule = []
     for unit in resources:
         confirmed = store.upcoming_reservations(unit["id"], now=period["start"])
         reservations[unit["id"]] = confirmed
+        if unit["active"]:
+            windows = list(islice(available_windows(unit, confirmed, now=now), 3))
+            schedule.append({"unit": unit, "windows": windows})
         usage.append({
             "unit": unit,
             **equipment_usage(unit, confirmed, start=period["start"], end=now),
@@ -44,7 +54,7 @@ def faculty_snapshot(store, lab_ids, period_value, now):
     states.sort(key=lambda row: (state_priority[row["state"]], row["starts_at"], row["id"]))
     return {
         "period": period, "queue": queue, "decisions": decisions,
-        "usage": usage, "reservations": states, "labs": store.labs(lab_ids),
+        "usage": usage, "schedule": schedule, "reservations": states, "labs": store.labs(lab_ids),
     }
 
 
@@ -55,8 +65,12 @@ def prepare_queue(store, pending, resources, reservations, now):
     by_id = {item["id"]: item for item in pending}
     ranked = recommend(pending, list(resources.values()), students, reservations, histories, now=now)
     return [
-        describe_recommendation(result, by_id[result.request_id], resources, reservations, students, histories, now)
-        for result in ranked
+        {
+            **describe_recommendation(result, by_id[result.request_id], resources, reservations, students, histories, now),
+            "rank": rank,
+            "competing": [item["project_title"] for item in preferred_conflicts(by_id[result.request_id], pending)],
+        }
+        for rank, result in enumerate(ranked, 1)
     ]
 
 
@@ -84,6 +98,11 @@ def describe_recommendation(result, item, resources, reservations, students, his
         item, list(resources.values()), students.get(uid), reservations, approved_intervals(histories[uid]), now,
     )
     overrides = [describe_slot(slot) for slot in other_slots if slot not in result.slots][:12]
-    if not reasons and (not options or options[0]["alternative"]):
+    if result.blocking_requests:
         reasons.append("A higher-priority recommendation uses the requested interval in this plan.")
-    return {"item": item, "score": result.score, "options": options, "overrides": overrides, "conflicts": reasons}
+    prior = prior_minutes(histories[uid], now)
+    return {
+        "item": item, "score": result.score, "options": options, "overrides": overrides,
+        "conflicts": reasons, "packing_gain": result.packing_gain, "prior_minutes": prior,
+        "factors": score_components(item, other_slots, prior, now) if other_slots else None,
+    }

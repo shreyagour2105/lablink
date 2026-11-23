@@ -7,26 +7,30 @@
   <h1>Find your equipment.<br><span>Build what’s next.</span></h1>
   <p class="editorial-copy">Find the lab equipment your project needs, explore availability, and request access in one place.</p>
   <div class="actions">
-    <a class="button button-paper" href="#workflow">Explore LabLink {% include "icon.html" with name="arrow" %}</a>
-    <a class="button button-dark-outline" href="{% url 'demo' %}">Try Demo</a>
+    <a class="button button-paper" href="{% url 'demo' %}">Try Interactive Demo {% include "icon.html" with name="arrow" %}</a>
+    <a class="button button-dark-outline" href="#workflow">See the workflow</a>
   </div>
 </section>
 
-<section class="wrap product-panel" aria-label="Preview of the LabLink equipment workspace">
+<section class="wrap product-panel" aria-label="Preview of a simulated scheduling conflict">
   <div class="product-top">
     <span class="brand"><span class="brand-mark" aria-hidden="true"></span>LabLink</span>
-    <span class="preview-label">Demo catalogue preview</span>
+    <span class="preview-label">Simulated conflict preview</span>
   </div>
   <div class="product-body">
     <div class="product-intro">
-      <p class="eyebrow">Equipment directory</p>
-      <h2>Start with the right tool.</h2>
-      <p>Search by name, department, or capability.</p>
+      <p class="eyebrow">One printer, competing requests</p>
+      <h2>Make room for both projects.</h2>
+      <p>Both projects want the 09:00 start. The planner gives the tighter deadline first priority and finds a later feasible slot for the flexible request.</p>
     </div>
     <ul class="preview-units">
-      <li><span class="preview-icon">{% include "icon.html" with name="equipment" %}</span><div><strong>FDM 3D Printer</strong><small>Mechanical Engineering</small></div><span class="preview-slot"><span class="led" aria-hidden="true"></span>09:00</span></li>
-      <li><span class="preview-icon">{% include "icon.html" with name="equipment" %}</span><div><strong>Digital Oscilloscope</strong><small>Electrical Engineering</small></div><span class="preview-slot"><span class="led" aria-hidden="true"></span>10:00</span></li>
-      <li><span class="preview-icon">{% include "icon.html" with name="equipment" %}</span><div><strong>GPU Workstation</strong><small>Computer Science</small></div><span class="preview-slot"><span class="led" aria-hidden="true"></span>11:00</span></li>
+      {% for item in conflict_preview %}
+        <li>
+          <span class="preview-icon">{% include "icon.html" with name="equipment" %}</span>
+          <div><strong>{{ item.project }}</strong><small>{{ item.equipment }} · Deadline {{ item.deadline_label }}</small></div>
+          <span class="preview-slot"><span class="led" aria-hidden="true"></span>{{ item.recommended_label }}<small>Recommended</small></span>
+        </li>
+      {% endfor %}
     </ul>
   </div>
 </section>
@@ -35,8 +39,10 @@
   <p class="eyebrow">The booking workflow</p>
   <h2 id="workflow-title">From finding equipment to getting time on it.</h2>
   <div class="workflow-grid">
-    <article>{% include "icon.html" with name="equipment" %}<h3>Find a lab</h3><p>Browse equipment across departments and check upcoming lab hours before submitting a request.</p></article>
-    <article>{% include "icon.html" with name="review" %}<h3>Review a request</h3><p>Faculty can compare feasible slots, see conflicts, and record an approval or rejection.</p></article>
+    <article>{% include "icon.html" with name="equipment" %}<h3>Discover equipment</h3><p>Search by name, department, or capability. Check specifications and lab hours.</p></article>
+    <article>{% include "icon.html" with name="review" %}<h3>Describe your project</h3><p>Set your deadline, duration, and preferred time window.</p></article>
+    <article>{% include "icon.html" with name="search" %}<h3>Get slot recommendations</h3><p>Compare feasible intervals and see how the planner resolves competing requests.</p></article>
+    <article>{% include "icon.html" with name="review" %}<h3>Faculty approval</h3><p>Faculty can approve a validated slot, reject the request, or ask for a revised window.</p></article>
   </div>
   <a href="{% url 'demo' %}" class="editorial-link">Explore both roles {% include "icon.html" with name="arrow" %}</a>
 </section>

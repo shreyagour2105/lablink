@@ -23,6 +23,10 @@ class DemoRequestForm(forms.Form):
     start = forms.TimeField(label="Preferred start", widget=forms.TimeInput(attrs={"type": "time"}), initial="09:00")
     end = forms.TimeField(label="Latest acceptable end", widget=forms.TimeInput(attrs={"type": "time"}), initial="12:00")
     deadline = forms.TimeField(label="Project deadline", widget=forms.TimeInput(attrs={"type": "time"}), initial="12:00")
+    urgency_note = forms.CharField(
+        label="Urgency justification (optional)", max_length=120, required=False,
+        help_text="Use fictional details. This note does not add priority points.",
+    )
     capability = forms.ChoiceField(
         label="Required capability",
         choices=[(unit[2], unit[2]) for unit in UNITS.values()],

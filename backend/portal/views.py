@@ -16,11 +16,14 @@ from google.auth.exceptions import DefaultCredentialsError
 
 from . import firebase_auth
 from .availability import available_windows
+from .demo_scheduling import landing_preview
 from .faculty_dashboard import faculty_snapshot
 from .forms import BookingForm, DecisionForm
 from .gemini import explain
 from .reporting import REPORT_PERIODS
-from .scheduling import approved_intervals, candidates, eligible, requested_slot_conflicts
+from .scheduling import (
+    allows_alternatives, approved_intervals, candidates, eligible, matches, requested_slot_conflicts,
+)
 from .store import BookingConflict, RequestNotFound, get_store
 
 
@@ -59,7 +62,7 @@ def require_account(view):
 
 @require_GET
 def home(request):
-    return render(request, "home.html")
+    return render(request, "home.html", {"conflict_preview": landing_preview()})
 
 
 @never_cache
@@ -197,15 +200,43 @@ def student_history(request, account):
     reservations = [item for item in items if item.get("reservation_id")]
     personal = approved_intervals(items)
     now = timezone.now()
+    resources = {}
     availability = {}
+    lab_equipment = {}
+
+    def booked_for(slug):
+        if slug not in availability:
+            availability[slug] = store.upcoming_reservations(slug, now=now)
+        return availability[slug]
+
     pending = [item for item in items if item["status"] == "pending"][:10]
     for item in pending:
         slug = item["resource_id"]
-        if slug not in availability:
-            availability[slug] = (store.resource(slug), store.upcoming_reservations(slug, now=now))
-        unit, booked = availability[slug]
+        if slug not in resources:
+            resources[slug] = store.resource(slug)
+        unit = resources[slug]
+        booked = booked_for(slug)
         item["conflicts"] = requested_slot_conflicts(item, unit, account, booked, personal, now=now)
-        item["suggestions"] = candidates(item, [unit] if unit else [], account, {slug: booked}, personal, now)[:3]
+        units = [unit] if unit else []
+        suggestions = candidates(item, units, account, {slug: booked}, personal, now)
+        if len(suggestions) < 3 and allows_alternatives(item):
+            lab = item["lab_id"]
+            if lab not in lab_equipment:
+                lab_equipment[lab] = store.lab_records("equipment", [lab])
+            alternatives = [
+                option for option in lab_equipment[lab]
+                if option["id"] != slug and matches(item, option, account)
+            ]
+            units.extend(alternatives)
+            suggestions.extend(candidates(
+                item, alternatives, account, {option["id"]: booked_for(option["id"]) for option in alternatives},
+                personal, now,
+            ))
+        by_id = {option["id"]: option for option in units}
+        item["suggestions"] = [
+            {"equipment": by_id[slot.resource_id], "start": slot.starts_at, "end": slot.ends_at}
+            for slot in suggestions[:3]
+        ]
         item["show_suggestions"] = True
     return render(request, "history.html", {"account": account, "items": items, "reservations": reservations})
 

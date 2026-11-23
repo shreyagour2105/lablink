@@ -14,13 +14,16 @@
             {% for item in items %}
               {% timezone item.time_zone %}
                 <tr>
-                  <td>{{ item.project_title }}<span class="cell-detail">{{ item.resource_name }}</span></td>
+                  <td>{{ item.project_title }}<span class="cell-detail">{{ item.resource_name }}</span>{% if item.urgency_note %}<span class="cell-detail">Urgency note: {{ item.urgency_note }}</span>{% endif %}</td>
                   <td>{{ item.starts_at|date:"M j, Y H:i" }}<span class="cell-detail">{{ item.duration_minutes }} min · {{ item.time_zone }}</span><span class="cell-detail">Deadline {{ item.deadline|date:"M j, Y H:i" }}</span></td>
                   <td><span class="status-pill" data-state="{{ item.status }}">{{ item.status|capfirst }}</span>{% if item.decision_reason %}<span class="cell-detail">{{ item.decision_reason }}</span>{% endif %}
                     {% if item.status == "reschedule requested" %}<a class="cell-detail" href="{% url 'resource-detail' item.resource_id %}">Submit a revised request</a>{% endif %}
                     {% if item.show_suggestions %}
+                      {% if item.suggestions %}<span class="cell-detail">Preferred equipment first, then closest start time. These times fit your requirements and current bookings. Faculty approval is pending.</span>{% endif %}
                       {% for conflict in item.conflicts %}<span class="cell-detail">{{ conflict }}</span>{% endfor %}
-                      {% for slot in item.suggestions %}<span class="cell-detail">Feasible: {{ slot.starts_at|date:"M j, H:i" }}–{{ slot.ends_at|date:"H:i" }}</span>{% empty %}<span class="cell-detail">No feasible slot for the requested equipment.</span>{% endfor %}
+                      {% for slot in item.suggestions %}
+                        {% timezone slot.equipment.time_zone %}<span class="cell-detail">Option {{ forloop.counter }} · Feasible: {{ slot.equipment.name }} · {{ slot.start|date:"M j, H:i" }}–{{ slot.end|date:"H:i" }} ({{ slot.equipment.time_zone }})</span>{% endtimezone %}
+                      {% empty %}<span class="cell-detail">No feasible slot for this request.</span>{% endfor %}
                     {% endif %}
                   </td>
                 </tr>

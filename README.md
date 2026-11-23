@@ -128,3 +128,6 @@ Open the landing page and choose **Try Demo**, then enter as Student or Faculty.
 Demo routes use no Firebase services and never grant access to real accounts. The existing campus sign-in remains available at `/sign-in/`. Vercel still needs `DJANGO_SECRET_KEY` for Django and demo cookie signing.
 
 The demo opens on a fixed fictional schedule. Two printer projects compete for 09:00. One has a tight deadline and fewer feasible starts. The other has more flexibility and a prior booking in the scenario. The deterministic planner suggests non-overlapping allocations and shows the scoring inputs. Faculty can select another feasible slot, reject a request, or request rescheduling. The demo-day utilisation table counts only confirmed demo-day intervals. Browser-scoped simulation state is independent of Firebase.
+
+
+The planner preserves deadline and fairness queue order, then considers up to 24 feasible placements for the current request and the next eight requests. It prefers the placement that leaves a feasible slot for the most later requests, breaking ties with equipment and time preferences. This bounded lookahead reduces avoidable conflicts. It is a heuristic and does not guarantee a globally optimal schedule. Urgency notes are visible to faculty and never increase the automatic score.

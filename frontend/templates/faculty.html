@@ -9,6 +9,7 @@
     <p>Assigned labs: {% for lab in labs %}{{ lab.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
     <nav class="section-nav" aria-label="Faculty dashboard sections">
       <a href="#pending">Requests</a>
+      <a href="#availability">Availability</a>
       <a href="#reservations">Reservations</a>
       <a href="#utilisation">Utilisation</a>
       <a href="#decisions">Decision history</a>
@@ -28,6 +29,7 @@
             <h3>{{ item.project_title }}</h3>
             <p>{{ item.resource_name }} · {{ item.duration_minutes }} minutes</p>
             <p class="request-purpose">{{ item.purpose }}</p>
+            {% if item.urgency_note %}<p class="cell-detail">Urgency note: {{ item.urgency_note }}</p>{% endif %}
             {% timezone item.time_zone %}
               <dl class="decision-facts">
                 <div><dt>Requested start</dt><dd>{{ item.starts_at|date:"M j, Y H:i" }}</dd></div>
@@ -36,6 +38,7 @@
               </dl>
             {% endtimezone %}
             {% if item.required_capabilities %}<p>Required: {{ item.required_capabilities|join:", " }}</p>{% endif %}
+            {% if entry.competing %}<p>Overlapping preferred times: {{ entry.competing|join:", " }}.</p>{% endif %}
             {% if entry.conflicts %}
               <div class="conflict-details">
                 <h4>Requested slot conflicts</h4>
@@ -43,7 +46,9 @@
               </div>
             {% endif %}
             {% if entry.options %}
-              <p>Scheduling score {{ entry.score }}. Availability is checked again on approval.</p>
+              <p><strong>Queue rank {{ entry.rank }}</strong> · Scheduling score {{ entry.score }}. Availability is checked again on approval.</p>
+              <p class="cell-detail">Deadline {{ entry.factors.urgency }}/40 · Slot scarcity {{ entry.factors.scarcity }}/25 · Equipment fit {{ entry.factors.fit }}/20 · Prior-usage fairness {{ entry.factors.fairness }}/15 ({{ entry.prior_minutes }} min booked in the last 7 days).</p>
+              {% if entry.packing_gain %}<p>The first slot leaves a feasible option for {{ entry.packing_gain }} more later request{{ entry.packing_gain|pluralize }} in the planner’s lookahead.</p>{% endif %}
             {% else %}
               <p>No feasible recommendation for this request in the current plan.</p>
             {% endif %}
@@ -56,7 +61,7 @@
                     {% if entry.options %}<optgroup label="Recommended slots">{% endif %}
                     {% for option in entry.options %}
                       {% timezone option.time_zone %}
-                        <option value="{{ option.value }}">{% if option.alternative %}Alternative{% else %}Requested{% endif %} · {{ option.name }} · {{ option.starts_at|date:"M j H:i" }}–{{ option.ends_at|date:"H:i" }} · {{ option.time_zone }}</option>
+                        <option value="{{ option.value }}">#{{ forloop.counter }} · {% if option.alternative %}Alternative{% else %}Requested{% endif %} · {{ option.name }} · {{ option.starts_at|date:"M j H:i" }}–{{ option.ends_at|date:"H:i" }} · {{ option.time_zone }}</option>
                       {% endtimezone %}
                     {% endfor %}
                     {% if entry.options %}</optgroup>{% endif %}
@@ -105,6 +110,24 @@
       {% empty %}
         <p>No pending requests for your assigned labs.</p>
       {% endfor %}
+    </section>
+
+    <section class="section-space" id="availability" aria-labelledby="availability-title">
+      <h2 id="availability-title">Equipment availability</h2>
+      <p>Next three open intervals per active unit. Closures and confirmed reservations are excluded.</p>
+      {% if schedule %}
+        <div class="panel">
+          <table>
+            <thead><tr><th scope="col">Equipment</th><th scope="col">Upcoming open intervals</th></tr></thead>
+            <tbody>{% for row in schedule %}
+              {% timezone row.unit.time_zone %}
+                <tr><td>{{ row.unit.name }}<span class="cell-detail">{{ row.unit.lab_name }} · {{ row.unit.time_zone }}</span></td>
+                <td>{% for start, end in row.windows %}<span class="cell-detail">{{ start|date:"M j, H:i" }}–{{ end|date:"H:i" }}</span>{% empty %}None in the next seven days{% endfor %}</td></tr>
+              {% endtimezone %}
+            {% endfor %}</tbody>
+          </table>
+        </div>
+      {% else %}<p>No active equipment is recorded for your assigned labs.</p>{% endif %}
     </section>
 
     <section class="section-space" id="reservations" aria-labelledby="reservations-title">

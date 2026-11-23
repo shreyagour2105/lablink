@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from .availability import available_windows
 from .reporting import equipment_usage
 from .scheduling import (
-    approved_intervals, candidates, prior_minutes, recommend, requested_slot_conflicts, score_components, slot_is_feasible,
+    approved_intervals, candidates, preferred_conflicts, prior_minutes, recommend, requested_slot_conflicts, score_components, slot_is_feasible,
 )
 
 NOW = datetime(2030, 1, 7, 8, tzinfo=UTC)
@@ -34,11 +34,11 @@ def resource(key):
     }
 
 
-def new_row(unit, title, purpose, start, end, deadline, minutes, *, capability=None, student="visitor", waited=0):
+def new_row(unit, title, purpose, start, end, deadline, minutes, *, capability=None, urgency_note="", student="visitor", waited=0):
     return {
         "unit": unit, "project": title, "purpose": purpose, "start": start, "end": end,
         "deadline": deadline, "minutes": minutes, "student": student, "waited": waited, "status": "pending",
-        "capability": capability or UNITS[unit][2],
+        "capability": capability or UNITS[unit][2], "urgency_note": urgency_note,
     }
 
 
@@ -104,14 +104,15 @@ def scenario(rows):
     plan = recommend(pending.values(), resources, students, by_unit, histories, now=NOW)
     order = [int(result.request_id) for result in plan]
     order.extend(index for index, row in enumerate(rows) if row["status"] != "pending")
-    planned = {int(result.request_id): result for result in plan}
+    planned = {int(result.request_id): (rank, result) for rank, result in enumerate(plan, 1)}
     requests = []
     for index in order:
         row = rows[index]
         item = {**row, "number": index, "equipment": UNITS[row["unit"]][0],
                 "preferred": interval(at(row["start"]), at(row["end"])),
                 "deadline_label": at(row["deadline"]).strftime("%H:%M")}
-        if result := planned.get(index):
+        if ranked := planned.get(index):
+            rank, result = ranked
             options = feasible(row, rows)
             personal = histories.get(row["student"], [])
             req = pending[str(index)]
@@ -120,19 +121,18 @@ def scenario(rows):
                          for slot in options],
                 recommended=result.slots[0].starts_at.hour * 60 + result.slots[0].starts_at.minute if result.slots else None,
                 recommended_label=interval(result.slots[0].starts_at, result.slots[0].ends_at) if result.slots else "",
-                score=result.score, prior=prior_minutes(personal, NOW),
+                score=result.score, rank=rank, packing_gain=result.packing_gain, prior=prior_minutes(personal, NOW),
                 factors=score_components(req, options, prior_minutes(personal, NOW), NOW) if options else None,
                 conflicts=requested_slot_conflicts(
                     req, resource(row["unit"]), STUDENT, by_unit[row["unit"]], approved_intervals(personal), now=NOW,
                 ),
             )
-            if result.slots and result.slots[0].starts_at != req["starts_at"] and not item["conflicts"]:
-                item["conflicts"] = ["The preferred start overlaps an earlier recommendation in the ranked queue."]
-            competing = [rows[int(other)]["project"] for other, candidate in pending.items()
-                         if other != str(index) and candidate["resource_id"] == req["resource_id"]
-                         and req["starts_at"] < candidate["starts_at"] + timedelta(minutes=candidate["duration_minutes"])
-                         and candidate["starts_at"] < req["starts_at"] + timedelta(minutes=req["duration_minutes"])]
-            item["competing"] = competing
+            if result.blocking_requests:
+                blockers = ", ".join(rows[int(blocker)]["project"] for blocker in result.blocking_requests)
+                item["conflicts"].append(f"The preferred time overlaps a higher-ranked recommendation for {blockers}.")
+            item["competing"] = [
+                rows[int(other["id"])]["project"] for other in preferred_conflicts(req, pending.values())
+            ]
         if row["status"] == "approved":
             start = at(row["allocated"])
             item["allocated_label"] = interval(start, start + timedelta(minutes=row["minutes"]))
@@ -142,3 +142,8 @@ def scenario(rows):
         unit["slots"] = [interval(start, end) for start, end in available_windows(unit, bookings, now=NOW)]
         unit["usage"] = equipment_usage(unit, bookings, start=at(540), end=at(720))
     return resources, requests
+
+
+def landing_preview():
+    _, requests = scenario(initial_rows())
+    return [row for row in requests if row["status"] == "pending"]

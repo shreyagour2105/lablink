@@ -8,7 +8,9 @@ from google.auth.credentials import AnonymousCredentials
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-from .scheduling import approved_intervals, candidates, equipment_capabilities, slot_is_feasible
+from .scheduling import (
+    allows_alternatives, approved_intervals, candidates, equipment_capabilities, matches, slot_is_feasible,
+)
 
 
 class BookingConflict(Exception):
@@ -76,12 +78,12 @@ class Store:
         labs = self.collection("labs")
         return [item for lab_id in lab_ids if (item := record(labs.document(lab_id).get()))]
 
-    def lab_records(self, collection_name, lab_ids):
+    def lab_records(self, collection_name, lab_ids, *, transaction=None):
         collection = self.collection(collection_name)
         return [
             record(snapshot)
             for lab_id in sorted(set(lab_ids))
-            for snapshot in collection.where(filter=FieldFilter("lab_id", "==", lab_id)).stream()
+            for snapshot in collection.where(filter=FieldFilter("lab_id", "==", lab_id)).stream(transaction=transaction)
         ]
 
     def submit(self, uid, slug, data):
@@ -112,7 +114,16 @@ class Store:
             }
             reservations = self.upcoming_reservations(slug, now=now, transaction=transaction)
             personal = approved_intervals(self.history(uid, transaction=transaction))
-            if not candidates(item, [resource], account, {slug: reservations}, personal, now):
+            feasible = candidates(item, [resource], account, {slug: reservations}, personal, now)
+            if not feasible and allows_alternatives(item):
+                for alternate in self.lab_records("equipment", [resource["lab_id"]], transaction=transaction):
+                    if alternate["id"] == slug or not matches(item, alternate, account):
+                        continue
+                    alt_bookings = self.upcoming_reservations(alternate["id"], now=now, transaction=transaction)
+                    feasible = candidates(item, [alternate], account, {alternate["id"]: alt_bookings}, personal, now)
+                    if feasible:
+                        break
+            if not feasible:
                 raise BookingConflict("That slot is unavailable or you are ineligible. Check the hours, deadline, and your reservations.")
             transaction.create(request_ref, {
                 **item,

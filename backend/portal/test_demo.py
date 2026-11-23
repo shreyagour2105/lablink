@@ -97,3 +97,24 @@ class DemoTests(SimpleTestCase):
         self.assertEqual(rows[1]["recommended_label"], "10:00–11:00")
         self.assertEqual(rows[1]["prior"], 90)
         self.assertIn("Prototype enclosure", rows[1]["competing"])
+
+
+    def test_signed_state_survives_a_new_client_and_mutations_require_csrf(self):
+        self.choose("faculty")
+        decision = reverse("demo-decide", args=[0])
+        self.assertEqual(self.client.post(decision, {"decision": "approved", "start": "540"}, secure=True).status_code, 403)
+        self.assertEqual(self.post("demo-decide", {"decision": "approved", "start": "540"}, 0).status_code, 302)
+        new_request_client = Client()
+        new_request_client.cookies[COOKIE] = self.client.cookies[COOKIE].value
+        page = new_request_client.get(reverse("demo-faculty"), secure=True)
+        self.assertContains(page, "1.00 / 3.00 h")
+        self.assertContains(page, "Reserved on demo day: 09:00–10:00")
+        self.assertNotContains(self.client.get(reverse("demo"), secure=True), "Sign in with a campus account")
+
+    def test_landing_shows_seeded_allocations_and_direct_demo_link(self):
+        page = self.client.get(reverse("home"), secure=True)
+        self.assertContains(page, 'href="/demo/">Try Interactive Demo')
+        self.assertContains(page, "Prototype enclosure")
+        self.assertContains(page, "Robot sensor mount")
+        self.assertContains(page, "09:00–10:00")
+        self.assertContains(page, "10:00–11:00")

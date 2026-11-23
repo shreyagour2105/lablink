@@ -173,12 +173,13 @@ class EmulatorBookingTests(SimpleTestCase):
         detail = reverse("resource-detail", args=["spectrometer"])
         self.assertContains(student.get(detail), "Request this equipment")
         self.assertEqual(self.post(student, detail, {**INPUTS, "duration_minutes": 14}).status_code, 400)
-        submitted = self.post(student, detail, INPUTS)
+        submitted = self.post(student, detail, {**INPUTS, "urgency_note": "A fixture assembly depends on this."})
         self.assertRedirects(submitted, reverse("student-history"))
         self.assertContains(student.get(reverse("student-history")), "Pending")
         item = self.store.history(self.student[0])[0]
         self.assertEqual(item["duration_minutes"], 60)
         self.assertEqual(item["deadline"], DEADLINE)
+        self.assertEqual(item["urgency_note"], "A fixture assembly depends on this.")
         self.assertEqual(self.store.upcoming_reservations("spectrometer", now=NOW), [])
         self.assertNotContains(other_student.get(reverse("student-history")), INPUTS["project_title"])
 
@@ -187,7 +188,10 @@ class EmulatorBookingTests(SimpleTestCase):
         unassigned.get(reverse("sign-in"))
         self.assertEqual(self.post(unassigned, decide, {"decision": "approved"}).status_code, 404)
         self.assertEqual(self.post(student, decide, {"decision": "approved"}).status_code, 403)
-        self.assertContains(faculty.get(reverse("faculty")), INPUTS["project_title"])
+        review = faculty.get(reverse("faculty"))
+        self.assertContains(review, INPUTS["project_title"])
+        self.assertContains(review, "A fixture assembly depends on this.")
+        self.assertContains(review, "Equipment availability")
         self.assertContains(self.post(faculty, decide, {"decision": "rejected"}), "Enter a reason", status_code=400)
         self.assertRedirects(self.post(faculty, decide, {"decision": "approved"}), reverse("faculty"))
         reservations = self.store.upcoming_reservations("spectrometer", now=NOW)
@@ -229,6 +233,29 @@ class EmulatorBookingTests(SimpleTestCase):
         self.assertRedirects(decision, reverse("faculty"))
         self.assertContains(student.get(reverse("student-history")), "Submit a revised request")
         self.assertEqual(len(self.store.upcoming_reservations(slug, now=NOW)), 1)
+
+    def test_flexible_request_can_use_compatible_equipment_when_preferred_unit_is_closed(self):
+        slug = "closed-favourite"
+        unit = {**RESOURCE, "capability": "Isolated extrusion"}
+        self.store.collection("equipment").document(slug).set({
+            **unit, "blocks": [{"starts_at": NOW, "ends_at": DEADLINE}],
+        })
+        self.store.collection("equipment").document("compatible-replacement").set({
+            **unit, "name": "Compatible replacement",
+        })
+        self.store.collection("equipment").document("restricted-replacement").set({
+            **unit, "name": "Restricted replacement", "access": "restricted",
+        })
+        visitor = self.create_user("student")
+        student = self.sign_in(visitor)
+        page = reverse("resource-detail", args=[slug])
+        student.get(page)
+        self.assertEqual(self.post(student, page, INPUTS).status_code, 409)
+        flexible = {**INPUTS, "earliest_start": INPUTS["starts_at"], "latest_end": INPUTS["deadline"]}
+        self.assertRedirects(self.post(student, page, flexible), reverse("student-history"))
+        history = student.get(reverse("student-history"))
+        self.assertContains(history, "Feasible: Compatible replacement")
+        self.assertNotContains(history, "Restricted replacement")
 
     def test_concurrent_approval_creates_one_reservation(self):
         resource = {**RESOURCE, "name": "Second sample spectrometer"}
@@ -530,6 +557,28 @@ class SchedulingTests(SimpleTestCase):
         self.assertEqual(results[0].slots, (Slot("scope", START, END),))
         self.assertEqual(results[1].slots, ())
         self.assertEqual(results, recommend([other, self.request], [self.unit], accounts, {}, {}, now=NOW))
+
+    def test_lookahead_keeps_rank_order_and_preserves_a_tight_second_request(self):
+        higher = {
+            **self.request, "earliest_start": START, "latest_end": END + timedelta(hours=1),
+            "submitted_at": NOW - timedelta(hours=49),
+        }
+        fixed = {**self.request, "id": "fixed", "student_uid": "other", "deadline": END}
+        accounts = {"s": self.student, "other": {"role": "student"}}
+        ranked = recommend([fixed, higher], [self.unit], accounts, {}, {}, now=NOW)
+        self.assertEqual([row.request_id for row in ranked], ["r", "fixed"])
+        self.assertEqual(ranked[0].slots[0], Slot("scope", END, END + timedelta(hours=1)))
+        self.assertEqual(ranked[0].packing_gain, 1)
+        self.assertEqual(ranked[1].slots[0], Slot("scope", START, END))
+
+    def test_tighter_deadline_wins_when_other_scoring_inputs_tie(self):
+        urgent = {**self.request, "id": "urgent", "student_uid": "other", "deadline": END}
+        flexible = {**self.request, "deadline": NOW + timedelta(days=4)}
+        accounts = {"s": self.student, "other": {"role": "student"}}
+        ranked = recommend([flexible, urgent], [self.unit], accounts, {}, {}, now=NOW)
+        self.assertEqual([row.request_id for row in ranked], ["urgent", "r"])
+        self.assertGreater(ranked[0].score, ranked[1].score)
+        self.assertEqual(ranked[1].blocking_requests, ("urgent",))
 
     def test_aged_feasible_request_overtakes_more_urgent_new_request(self):
         urgent = {**self.request, "id": "fresh", "student_uid": "other", "deadline": END}

@@ -40,6 +40,10 @@ class BookingForm(forms.Form):
     )
     deadline = LabDateTimeField(label="Project deadline", max_length=16)
 
+    urgency_note = forms.CharField(
+        label="Urgency justification (optional)", max_length=300, required=False,
+        help_text="Faculty can read this note. It does not add priority points.",
+    )
     required_capabilities = forms.CharField(
         label="Additional required capabilities (optional)", max_length=240, required=False,
         help_text="Separate equipment capabilities with commas.",
