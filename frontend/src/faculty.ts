@@ -49,7 +49,7 @@ if (dialog?.showModal && title && description && confirmButton) {
     const approving = button.value === "approved";
     const rescheduling = button.value === "reschedule requested";
     const slot = form.querySelector<HTMLSelectElement>("select[name=slot]")?.selectedOptions[0];
-    const slotLabel = slot?.textContent?.trim().replace(/^(Requested|Alternative) · /, "");
+    const slotLabel = slot?.textContent?.trim().replace(/^(?:#\d+ · )?(?:Requested|Alternative) · /, "");
     title.textContent = approving ? "Approve this request?" : rescheduling ? "Request rescheduling?" : "Reject this request?";
     description.textContent = approving && slotLabel
       ? `Reserve ${slotLabel} if it is still available.`

@@ -9,7 +9,12 @@ from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from .scheduling import (
-    allows_alternatives, approved_intervals, candidates, equipment_capabilities, matches, slot_is_feasible,
+    allows_alternatives,
+    approved_intervals,
+    candidates,
+    equipment_capabilities,
+    matches,
+    slot_is_feasible,
 )
 
 

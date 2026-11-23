@@ -10,7 +10,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_GET, require_POST, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from google.api_core.exceptions import GoogleAPICallError
 from google.auth.exceptions import DefaultCredentialsError
 
@@ -21,11 +21,9 @@ from .faculty_dashboard import faculty_snapshot
 from .forms import BookingForm, DecisionForm
 from .gemini import explain
 from .reporting import REPORT_PERIODS
-from .scheduling import (
-    allows_alternatives, approved_intervals, candidates, eligible, matches, requested_slot_conflicts,
-)
+from .scheduling import eligible
 from .store import BookingConflict, RequestNotFound, get_store
-
+from .student_dashboard import booking_history
 
 logger = logging.getLogger(__name__)
 
@@ -195,50 +193,8 @@ def resource_detail(request, account, slug):
 def student_history(request, account):
     if account["role"] != "student":
         return error_page(request, 403, "Student access required", "Student histories are private to each student.")
-    store = get_store()
-    items = store.history(account["id"])
-    reservations = [item for item in items if item.get("reservation_id")]
-    personal = approved_intervals(items)
-    now = timezone.now()
-    resources = {}
-    availability = {}
-    lab_equipment = {}
-
-    def booked_for(slug):
-        if slug not in availability:
-            availability[slug] = store.upcoming_reservations(slug, now=now)
-        return availability[slug]
-
-    pending = [item for item in items if item["status"] == "pending"][:10]
-    for item in pending:
-        slug = item["resource_id"]
-        if slug not in resources:
-            resources[slug] = store.resource(slug)
-        unit = resources[slug]
-        booked = booked_for(slug)
-        item["conflicts"] = requested_slot_conflicts(item, unit, account, booked, personal, now=now)
-        units = [unit] if unit else []
-        suggestions = candidates(item, units, account, {slug: booked}, personal, now)
-        if len(suggestions) < 3 and allows_alternatives(item):
-            lab = item["lab_id"]
-            if lab not in lab_equipment:
-                lab_equipment[lab] = store.lab_records("equipment", [lab])
-            alternatives = [
-                option for option in lab_equipment[lab]
-                if option["id"] != slug and matches(item, option, account)
-            ]
-            units.extend(alternatives)
-            suggestions.extend(candidates(
-                item, alternatives, account, {option["id"]: booked_for(option["id"]) for option in alternatives},
-                personal, now,
-            ))
-        by_id = {option["id"]: option for option in units}
-        item["suggestions"] = [
-            {"equipment": by_id[slot.resource_id], "start": slot.starts_at, "end": slot.ends_at}
-            for slot in suggestions[:3]
-        ]
-        item["show_suggestions"] = True
-    return render(request, "history.html", {"account": account, "items": items, "reservations": reservations})
+    history = booking_history(get_store(), account, now=timezone.now())
+    return render(request, "history.html", {"account": account, **history})
 
 
 def render_faculty(request, account, *, status=200, decision_error=None, explanation_request_id=None):

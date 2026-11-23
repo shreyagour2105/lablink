@@ -10,7 +10,8 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "lablink.vercel_settings")
 
 # Google ADC reads a file. Keep the Vercel secret in private, ephemeral storage.
 if credentials := os.environ.get("LABLINK_GOOGLE_CREDENTIALS_JSON"):
-    credential_file = NamedTemporaryFile(mode="w", encoding="utf-8")
+    # ADC opens the credentials lazily. Retain the file until this worker exits.
+    credential_file = NamedTemporaryFile(mode="w", encoding="utf-8")  # noqa: SIM115
     credential_file.write(credentials)
     credential_file.flush()
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credential_file.name

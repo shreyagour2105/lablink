@@ -8,7 +8,14 @@ from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
-from .demo_scheduling import UNITS, can_approve, feasible, initial_rows, new_row, scenario
+from .demo_scheduling import (
+    UNITS,
+    can_approve,
+    feasible,
+    initial_rows,
+    new_row,
+    scenario,
+)
 
 COOKIE = "lablink_demo"
 SALT = "lablink.demo.v2"
