@@ -1,0 +1,94 @@
+<section class="section-space student-overview" aria-labelledby="student-overview-title">
+  <h2 id="student-overview-title">Demo workspace at a glance</h2>
+  <p>Counts include fictional projects in this browser, including prior approvals.</p>
+  <nav class="student-quick-actions" aria-label="Student quick actions">
+    <a class="button button-outline" href="#demo-catalog">Explore Equipment</a>
+    <a class="button" href="{% url 'demo-student' %}?request=1#new-demo-request">New Project Request {% include "icon.html" with name="arrow" %}</a>
+    <a class="button button-outline" href="#demo-requests">My Requests</a>
+    <a class="button button-outline" href="#dashboard-recommendations">View Recommended Slots</a>
+  </nav>
+  <dl class="student-metrics">
+    {% for label, count in dashboard.metrics %}
+      <div class="panel student-metric">
+        <dt>{{ label }}</dt>
+        <dd>{{ count }}</dd>
+      </div>
+    {% endfor %}
+  </dl>
+</section>
+
+<div class="student-dashboard-grid">
+  <section class="panel student-dashboard-panel" aria-labelledby="dashboard-upcoming">
+    <h2 id="dashboard-upcoming">Upcoming bookings</h2>
+    {% if dashboard.upcoming %}
+      <ul class="student-dashboard-list">
+        {% for row in dashboard.upcoming %}
+          <li>
+            <strong>{{ row.equipment }}</strong> <span class="status-pill" data-state="approved">Simulated approved</span>
+            <a class="cell-detail" href="#demo-request-{{ row.number }}">{{ row.project }}</a>
+            <span class="cell-detail"><time datetime="{{ dashboard.day|date:'Y-m-d' }}">{{ dashboard.day|date:"D, M j, Y" }}</time> · {{ row.allocated_label }} UTC</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No upcoming reservations. An upcoming slot appears here after faculty approve a request.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel student-dashboard-panel" id="dashboard-recommendations" aria-labelledby="dashboard-recommendations-title">
+    <h2 id="dashboard-recommendations-title">Intelligent recommendations</h2>
+    {% if dashboard.recommendations %}
+      <ul class="student-dashboard-list">
+        {% for row in dashboard.recommendations %}
+          <li>
+            <a href="#demo-request-{{ row.number }}"><strong>{{ row.project }}</strong></a>
+            {% if row.recommended_label %}
+              <p>{{ row.equipment }} · Suggested {{ row.recommended_label }} UTC</p>
+              <span class="cell-detail">Fits the required duration and deadline. Queue rank {{ row.rank }}.</span>
+            {% else %}
+              <p>No slot fits this request in the current ranked plan.</p>
+            {% endif %}
+            {% if row.competing %}<span class="cell-detail">Competing preferred time: {{ row.competing|join:", " }}.</span>{% endif %}
+            {% for conflict in row.conflicts %}<span class="cell-detail">{{ conflict }}</span>{% endfor %}
+            {% if row.alternatives %}<span class="cell-detail">Alternatives before pending allocations: {{ row.alternatives|join:", " }}.</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+      <p class="cell-detail">Showing up to three pending requests. Recommended and alternative slots still require faculty approval.</p>
+    {% else %}
+      <p>No pending requests to recommend slots for. Submit a project request to get started.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="section-space" aria-labelledby="dashboard-projects">
+  <h2 id="dashboard-projects">My projects</h2>
+  {% if dashboard.projects %}
+    <div class="panel table-scroll" role="region" aria-label="Demo projects and approval status" tabindex="0">
+      <table>
+        <thead><tr><th scope="col">Project</th><th scope="col">Requested equipment</th><th scope="col">Demo deadline</th><th scope="col">Status</th></tr></thead>
+        <tbody>
+          {% for row in dashboard.projects %}
+            <tr>
+              <td><a href="#demo-request-{{ row.number }}">{{ row.project }}</a></td>
+              <td>{{ row.equipment }}</td>
+              <td>{{ row.deadline_label }} UTC</td>
+              <td><span class="status-pill" data-state="{{ row.status }}">{{ row.status|capfirst }}</span></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}<p>No projects yet. Start a request from the equipment catalogue.</p>{% endif %}
+</section>
+
+<section class="section-space" aria-labelledby="dashboard-activity">
+  <h2 id="dashboard-activity">Recent activity</h2>
+  {% if dashboard.activity %}
+    <ul class="panel student-dashboard-list student-activity">
+      {% for row, event in dashboard.activity %}
+        <li><strong>{{ event }}</strong> <span aria-hidden="true">·</span> <a href="#demo-request-{{ row.number }}">{{ row.project }}</a></li>
+      {% endfor %}
+    </ul>
+  {% else %}<p>Submit a request or try a faculty decision to see activity from this demo session.</p>{% endif %}
+</section>

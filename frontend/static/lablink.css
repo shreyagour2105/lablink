@@ -222,3 +222,22 @@ tbody tr { border-top: 1px solid var(--line); }
 }
 
 .demo-request-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); }
+
+/* Student demo overview */
+.student-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: .75rem; margin: 1rem 0; }
+.student-metric, .student-dashboard-panel { padding: clamp(1rem, 2.6vw, 1.45rem); }
+.student-metric dt { color: var(--muted); font-size: .85rem; font-weight: 650; }
+.student-metric dd { margin-top: .2rem; font-size: 2rem; font-weight: 750; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+.student-quick-actions { display: flex; justify-content: flex-start; gap: .55rem; }
+.student-quick-actions .button:hover { text-decoration: none; }
+.student-dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; margin-block: 2.55rem; align-items: start; }
+.student-dashboard-list { margin: 0; padding: 0; list-style: none; }
+.student-dashboard-list li { padding-block: .75rem; overflow-wrap: anywhere; }
+.student-dashboard-list li + li { border-top: 1px solid var(--line); }
+.student-dashboard-list li p { margin: .25rem 0; }
+.student-activity { margin-top: 1rem; padding-inline: clamp(1rem, 2.6vw, 1.45rem); }
+
+.student-quick-actions { margin-block: .9rem 1rem; }
+@media (max-width: 42rem) {
+  .workspace-shell .student-overview { margin-top: 1.5rem; }
+}

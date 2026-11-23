@@ -118,3 +118,56 @@ class DemoTests(SimpleTestCase):
         self.assertContains(page, "Robot sensor mount")
         self.assertContains(page, "09:00–10:00")
         self.assertContains(page, "10:00–11:00")
+
+    def test_student_dashboard_updates_metrics_bookings_and_activity(self):
+        self.choose("student")
+        url = reverse("demo-student")
+        initial = self.client.get(url, secure=True)
+        self.assertContains(initial, "Student Dashboard")
+        self.assertContains(initial, "No upcoming reservations.")
+        self.assertContains(initial, "see activity from this demo session")
+        self.assertEqual(dict(initial.context["dashboard"]["metrics"]), {
+            "Available Equipment": 3, "Pending Requests": 2,
+            "Approved Bookings": 1, "Upcoming Reservations": 0,
+        })
+        filtered = self.client.get(url, {"department": "Mechanical Engineering", "request": "1"}, secure=True)
+        self.assertEqual(dict(filtered.context["dashboard"]["metrics"])["Available Equipment"], 3)
+        self.assertEqual(filtered.context["request_unit"], "printer")
+        self.assertContains(filtered, "<details open>")
+
+        payload = {
+            "unit": "printer", "title": "Dashboard fixture", "purpose": "Print a test bracket.",
+            "start": "09:00", "end": "12:00", "deadline": "12:00", "minutes": "60",
+            "capability": "Prototype fabrication",
+        }
+        self.assertEqual(self.client.post(reverse("demo-submit"), payload, secure=True).status_code, 403)
+        self.assertEqual(self.post("demo-submit", payload).status_code, 302)
+        submitted = self.client.get(url, secure=True)
+        self.assertEqual(dict(submitted.context["dashboard"]["metrics"])["Pending Requests"], 3)
+        self.assertContains(submitted, "Request submitted")
+
+        self.choose("faculty")
+        self.assertEqual(self.client.get(url, secure=True).status_code, 403)
+        self.assertEqual(self.post("demo-decide", {"decision": "approved", "start": "660"}, 3).status_code, 302)
+        self.assertEqual(self.post("demo-decide", {"decision": "reschedule requested"}, 1).status_code, 302)
+        self.choose("student")
+
+        updated = self.client.get(url, secure=True)
+        dashboard = updated.context["dashboard"]
+        self.assertEqual(dict(dashboard["metrics"]), {
+            "Available Equipment": 3, "Pending Requests": 1,
+            "Approved Bookings": 2, "Upcoming Reservations": 1,
+        })
+        self.assertEqual([row["project"] for row in dashboard["upcoming"]], ["Dashboard fixture"])
+        self.assertEqual(dashboard["upcoming"][0]["allocated_label"], "11:00–12:00")
+        self.assertContains(updated, "Faculty approved the request")
+        self.assertContains(updated, "Faculty requested rescheduling")
+        self.assertEqual(dashboard["activity"][0][0]["project"], "Robot sensor mount")
+
+    @patch("portal.demo.initial_rows", return_value=[])
+    def test_dashboard_project_and_recommendation_empty_states(self, _):
+        self.choose("student")
+        page = self.client.get(reverse("demo-student"), secure=True)
+        self.assertContains(page, "No projects yet.")
+        self.assertContains(page, "No pending requests to recommend slots for.")
+        self.assertContains(page, "No upcoming reservations.")

@@ -16,6 +16,7 @@ from .demo_scheduling import (
     new_row,
     scenario,
 )
+from .demo_student_dashboard import record_activity, student_overview
 
 COOKIE = "lablink_demo"
 SALT = "lablink.demo.v2"
@@ -97,11 +98,18 @@ def render_workspace(request, state, *, error=None, status=200, bound_form=None,
         if query.casefold() in f'{item["name"]} {item["department"]} {item["capability"]}'.casefold()
         and (not department or item["department"] == department)
     ]
+    at_limit = len(state["requests"]) >= MAX_REQUESTS
+    request_unit = None
+    dashboard = None
+    if state["role"] == "student":
+        dashboard = student_overview(units, requests)
+        if request.GET.get("request") == "1" and not at_limit and bound_form is None:
+            request_unit = next((unit["id"] for unit in filtered if unit["slots"]), None)
     return render(request, "demo_workspace.html", {
         "demo_role": state["role"], "units": filtered, "query": query,
         "departments": sorted({item["department"] for item in units}), "department": department,
         "requests": requests, "schedule": units, "error": error,
-        "at_limit": len(state["requests"]) >= MAX_REQUESTS,
+        "at_limit": at_limit, "dashboard": dashboard, "request_unit": request_unit,
     }, status=status)
 
 
@@ -134,6 +142,7 @@ def submit(request):
         return render_workspace(request, state,
                                 error="No feasible slot fits those requirements, or the demo request limit was reached.",
                                 status=409, bound_form=form, bound_unit=unit)
+    record_activity(row, rows)
     rows.append(row)
     return save_state(state, "student")
 
@@ -157,4 +166,5 @@ def decide(request, number):
             return render_workspace(request, state, error="This allocation conflicts with the booking constraints.", status=409)
         row["allocated"] = int(raw)
     row["status"] = decision
+    record_activity(row, rows)
     return save_state(state, "faculty")
