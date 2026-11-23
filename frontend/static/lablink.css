@@ -288,7 +288,7 @@ tbody tr { border-top: 1px solid var(--line); }
 .student-heading-icon { width: 3rem; height: 3rem; font-size: 1.35rem; }
 .student-heading-icon .icon, .student-metric-icon .icon, .upcoming-icon .icon { margin: 0; color: currentColor; }
 
-.student-quick-actions { display: grid; gap: .75rem; }
+.student-quick-actions { display: grid; justify-content: stretch; gap: .75rem; }
 .student-quick-actions .button:hover { text-decoration: none; }
 .student-action-row { display: flex; flex-wrap: wrap; gap: .45rem; }
 .discovery-banner {
