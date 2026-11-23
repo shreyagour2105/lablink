@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from functools import lru_cache
 
 import firebase_admin
@@ -28,28 +29,28 @@ def firebase_app():
             return firebase_admin.get_app()
 
 
-def verify_id_token(token):
+@contextmanager
+def _translate_auth_errors(*invalid_token_errors: type[Exception]):
+    """Translate provider failures without changing the caller's credential checks."""
+    invalid_credentials = (*invalid_token_errors, auth.UserDisabledError, auth.UserNotFoundError)
     try:
-        return auth.verify_id_token(token, app=firebase_app(), check_revoked=True)
-    except (auth.InvalidIdTokenError, auth.RevokedIdTokenError, auth.UserDisabledError, auth.UserNotFoundError) as error:
+        yield
+    except invalid_credentials as error:
         raise InvalidCredential from error
     except (exceptions.FirebaseError, GoogleAuthError) as error:
         raise AuthUnavailable from error
+
+
+def verify_id_token(token):
+    with _translate_auth_errors(auth.InvalidIdTokenError, auth.RevokedIdTokenError):
+        return auth.verify_id_token(token, app=firebase_app(), check_revoked=True)
 
 
 def create_cookie(token, expires_in):
-    try:
+    with _translate_auth_errors(auth.InvalidIdTokenError):
         return auth.create_session_cookie(token, expires_in=expires_in, app=firebase_app())
-    except (auth.InvalidIdTokenError, auth.UserDisabledError, auth.UserNotFoundError) as error:
-        raise InvalidCredential from error
-    except (exceptions.FirebaseError, GoogleAuthError) as error:
-        raise AuthUnavailable from error
 
 
 def verify_cookie(cookie):
-    try:
+    with _translate_auth_errors(auth.InvalidSessionCookieError, auth.RevokedSessionCookieError):
         return auth.verify_session_cookie(cookie, app=firebase_app(), check_revoked=True)
-    except (auth.InvalidSessionCookieError, auth.RevokedSessionCookieError, auth.UserDisabledError, auth.UserNotFoundError) as error:
-        raise InvalidCredential from error
-    except (exceptions.FirebaseError, GoogleAuthError) as error:
-        raise AuthUnavailable from error

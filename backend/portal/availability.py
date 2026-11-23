@@ -1,9 +1,12 @@
+from collections import defaultdict
+from collections.abc import Iterable, Iterator
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from django.utils import timezone
 
 HORIZON_DAYS = 7
+Interval = tuple[datetime, datetime]
 
 
 def local_instant(value, zone, *, allow_ambiguous=False):
@@ -17,7 +20,69 @@ def local_instant(value, zone, *, allow_ambiguous=False):
     return first
 
 
-def available_windows(resource, reserved=(), *, now=None):
+def _opening_intervals(resource, start: datetime, end: datetime) -> Iterator[Interval]:
+    zone = ZoneInfo(resource["time_zone"])
+    first_day = start.astimezone(zone).date()
+    last_day = end.astimezone(zone).date()
+    by_weekday = defaultdict(list)
+    for window in sorted(resource["windows"], key=lambda item: item["opens_at"]):
+        by_weekday[window["weekday"]].append(window)
+
+    for offset in range((last_day - first_day).days + 1):
+        day = first_day + timedelta(days=offset)
+        merged: Interval | None = None
+        for window in by_weekday[day.weekday()]:
+            opens = datetime.combine(day, time.fromisoformat(window["opens_at"]))
+            closes = datetime.combine(day, time.fromisoformat(window["closes_at"]))
+            try:
+                left = max(start, local_instant(opens, zone, allow_ambiguous=True))
+                right = min(end, local_instant(closes, zone, allow_ambiguous=True))
+            except ValueError:
+                # A schedule boundary skipped by a clock change cannot be offered.
+                continue
+            if left >= right:
+                continue
+            if merged is not None and left <= merged[1]:
+                merged = (merged[0], max(merged[1], right))
+            else:
+                if merged is not None:
+                    yield merged
+                merged = (left, right)
+        if merged is not None:
+            yield merged
+
+
+def subtract_intervals(windows: Iterable[Interval], blocked: Iterable[Interval]) -> Iterator[Interval]:
+    """Subtract occupied time from ordered, non-overlapping half-open windows."""
+    blocks = iter(sorted((left, right) for left, right in blocked if left < right))
+    block = next(blocks, None)
+    for start, end in windows:
+        while block is not None and block[0] < end:
+            block_start, block_end = block
+            if block_end > start:
+                if block_start > start:
+                    yield start, block_start
+                start = block_end
+                if start >= end:
+                    # This block can continue into another opening window.
+                    break
+            block = next(blocks, None)
+        if start < end:
+            yield start, end
+
+
+def operating_intervals(
+    resource, period_start: datetime, period_end: datetime, reserved=()
+) -> Iterator[Interval]:
+    """Opening intervals after closures and bookings, clipped to a reporting period."""
+    if period_start >= period_end:
+        return
+    closures = resource.get("blocks", [])
+    blocked = ((row["starts_at"], row["ends_at"]) for row in (*closures, *reserved))
+    yield from subtract_intervals(_opening_intervals(resource, period_start, period_end), blocked)
+
+
+def available_windows(resource, reserved=(), *, now=None) -> Iterator[Interval]:
     zone = ZoneInfo(resource["time_zone"])
     now = (now or timezone.now()).astimezone(UTC)
     local_date = now.astimezone(zone).date()
@@ -25,53 +90,7 @@ def available_windows(resource, reserved=(), *, now=None):
     yield from operating_intervals(resource, now, horizon_end, reserved)
 
 
-def operating_intervals(resource, period_start, period_end, reserved=()):
-    """Opening intervals after closures, clipped to an arbitrary reporting period."""
-    if period_start >= period_end:
-        return
-    zone = ZoneInfo(resource["time_zone"])
-    local_date = period_start.astimezone(zone).date()
-    last_date = period_end.astimezone(zone).date()
-    blocks = [(block["starts_at"], block["ends_at"]) for block in resource.get("blocks", [])]
-    blocks.extend((item["starts_at"], item["ends_at"]) for item in reserved)
-    blocks.sort()
-
-    for offset in range((last_date - local_date).days + 1):
-        date = local_date + timedelta(days=offset)
-        day_ranges = []
-        for window in sorted(resource["windows"], key=lambda item: item["opens_at"]):
-            if window["weekday"] != date.weekday():
-                continue
-            opens = datetime.combine(date, time.fromisoformat(window["opens_at"]))
-            closes = datetime.combine(date, time.fromisoformat(window["closes_at"]))
-            try:
-                start = max(period_start, local_instant(opens, zone, allow_ambiguous=True))
-                stop = min(period_end, local_instant(closes, zone, allow_ambiguous=True))
-            except ValueError:
-                # A schedule boundary skipped by a clock change cannot be offered.
-                continue
-            if start >= stop:
-                continue
-            if day_ranges and start <= day_ranges[-1][1]:
-                previous_start, previous_stop = day_ranges[-1]
-                day_ranges[-1] = (previous_start, max(previous_stop, stop))
-            else:
-                day_ranges.append((start, stop))
-
-        for start, stop in day_ranges:
-            for block_start, block_end in blocks:
-                if block_end <= start:
-                    continue
-                if block_start >= stop:
-                    break
-                if block_start > start:
-                    yield start, block_start
-                start = max(start, block_end)
-                if start >= stop:
-                    break
-            if start < stop:
-                yield start, stop
-
-
-def interval_is_available(resource, reservations, start, end, *, now):
-    return any(left <= start < end <= right for left, right in available_windows(resource, reservations, now=now))
+def interval_is_available(resource, reservations, start, end, *, now) -> bool:
+    return any(
+        left <= start < end <= right for left, right in available_windows(resource, reservations, now=now)
+    )

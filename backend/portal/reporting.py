@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from .availability import operating_intervals
+from .availability import operating_intervals, subtract_intervals
 
 REPORT_PERIODS = (7, 30)
 
@@ -21,19 +21,9 @@ def reservation_state(start, end, now):
 def equipment_usage(resource, reservations, *, start, end):
     windows = list(operating_intervals(resource, start, end))
     available = sum((right - left).total_seconds() for left, right in windows)
-    # Merge intersecting booking fragments so the same minute cannot be counted twice.
-    fragments = sorted(
-        (max(left, reservation["starts_at"]), min(right, reservation["ends_at"]))
-        for reservation in reservations
-        for left, right in windows
-        if reservation["starts_at"] < right and left < reservation["ends_at"]
-    )
-    booked = 0.0
-    previous_end = start
-    for left, right in fragments:
-        if right > previous_end:
-            booked += (right - max(left, previous_end)).total_seconds()
-            previous_end = right
+    blocked = ((row["starts_at"], row["ends_at"]) for row in reservations)
+    unbooked = sum((right - left).total_seconds() for left, right in subtract_intervals(windows, blocked))
+    booked = available - unbooked
     return {
         "available_hours": available / 3600,
         "booked_hours": booked / 3600,

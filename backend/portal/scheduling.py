@@ -389,7 +389,10 @@ def requested_slot_conflicts(request, resource, student, reservations, student_r
         reasons.append("The interval is outside operating hours or the seven-day booking window.")
 
     def intersects(intervals):
-        return any(block["starts_at"] < end and start < block["ends_at"] for block in intervals)
+        return any(
+            block["starts_at"] < block["ends_at"] and block["starts_at"] < end and start < block["ends_at"]
+            for block in intervals
+        )
 
     if intersects(resource.get("blocks", [])):
         reasons.append("A maintenance or closure block overlaps the requested interval.")
