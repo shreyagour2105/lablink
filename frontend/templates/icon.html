@@ -1,7 +1,13 @@
 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
 {% if name == "arrow" %}<path d="M4 12h15m-6-6 6 6-6 6"/>
-{% elif name == "equipment" %}<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Zm0 9 8-4.5M12 12v9m0-9L4 7.5"/>
+{% elif name == "equipment" or name == "available-equipment" %}<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Zm0 9 8-4.5M12 12v9m0-9L4 7.5"/>
 {% elif name == "review" %}<path d="M9 5H5v15h14V5h-4M9 3h6v4H9zM8 13l2 2 5-5"/>
 {% elif name == "search" %}<circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4 4"/>
+{% elif name == "student" %}<path d="m2 9 10-5 10 5-10 5L2 9Zm4 2v5c3 3 9 3 12 0v-5m4-2v6"/>
+{% elif name == "overview" %}<rect x="3.5" y="3.5" width="7" height="7" rx="1.25"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.25"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.25"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.25"/>
+{% elif name == "info" %}<circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/>
+{% elif name == "pending-requests" %}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+{% elif name == "approved-bookings" %}<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/>
+{% elif name == "calendar" or name == "upcoming-reservations" %}<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4m8-4v4M4 10h16m-11 5h.01m3 0h.01m3 0h.01"/>
 {% endif %}
 </svg>

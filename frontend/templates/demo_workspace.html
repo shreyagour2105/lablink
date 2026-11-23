@@ -1,9 +1,23 @@
 {% extends "base.html" %}
 {% block title %}{{ demo_role|capfirst }} demo | LabLink{% endblock %}
 {% block content %}
-<div class="wrap page">
-  <h1 id="demo-overview">{% if dashboard %}Student Dashboard{% else %}Faculty demo{% endif %}</h1>
-  <p>Fictional equipment and simulated bookings only. The demo clock is fixed. Unless marked as prior usage, times are on Monday, 7 January 2030 (UTC).</p>
+<div class="wrap page{% if dashboard %} student-page{% endif %}">
+  {% if dashboard %}
+    <header class="student-heading">
+      <div>
+        <p class="student-eyebrow">Student workspace</p>
+        <h1 id="demo-overview">Student Dashboard</h1>
+        <p>Find equipment, plan project time, and track your requests.</p>
+      </div>
+      <span class="student-heading-icon">{% include "icon.html" with name="student" %}</span>
+    </header>
+  {% else %}
+    <h1 id="demo-overview">Faculty demo</h1>
+  {% endif %}
+  <aside class="demo-notice" aria-label="About this demo">
+    {% include "icon.html" with name="info" %}
+    <p><strong>Simulated demo.</strong> Your browser holds the demo records. Times use 7 Jan 2030 (UTC), except prior bookings.</p>
+  </aside>
   {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
   {% if dashboard %}
     {% include "demo_student_overview.html" %}

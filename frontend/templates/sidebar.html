@@ -4,11 +4,11 @@
     <nav aria-label="Workspace navigation">
       {% if demo_role %}
         {% if demo_role == "student" %}
-          <a href="#demo-overview" aria-current="page">Overview</a>
+          <a href="#demo-overview" aria-current="page">{% include "icon.html" with name="overview" %} Overview</a>
           <a href="{% url 'demo-student' %}#demo-catalog">{% include "icon.html" with name="equipment" %} Sample equipment</a>
         {% endif %}
         <a href="#demo-requests">{% include "icon.html" with name="review" %} Simulated requests</a>
-        {% if demo_role == "faculty" %}<a href="#demo-schedule">Schedule and utilisation</a>{% endif %}
+        {% if demo_role == "faculty" %}<a href="#demo-schedule">{% include "icon.html" with name="calendar" %} Schedule and utilisation</a>{% endif %}
       {% else %}
         <a href="{% url 'catalog' %}"{% if request.resolver_match.url_name == "catalog" or request.resolver_match.url_name == "resource-detail" %} aria-current="true"{% endif %}>{% include "icon.html" with name="equipment" %} Equipment</a>
         {% if account.role == "faculty" %}
