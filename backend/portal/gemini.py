@@ -36,7 +36,9 @@ class Explanation:
 
 def explain(entry, *, now):
     if not entry["options"]:
-        return Explanation("The scheduler currently has no feasible recommendation for this request.")
+        return Explanation(
+            "The scheduler currently has no feasible recommendation for this request."
+        )
     first = entry["options"][0]
     item = entry["item"]
     facts = []
@@ -56,9 +58,12 @@ def explain(entry, *, now):
     highlights = selection or facts[:2]
     summary = (
         "The first recommendation is an alternative allocation for this request."
-        if first["alternative"] else "The first recommendation matches the requested slot."
+        if first["alternative"]
+        else "The first recommendation matches the requested slot."
     )
-    return Explanation(summary, tuple(FACTS[key] for key in highlights), selection is not None)
+    return Explanation(
+        summary, tuple(FACTS[key] for key in highlights), selection is not None
+    )
 
 
 def select_highlights(facts):
@@ -69,8 +74,9 @@ def select_highlights(facts):
 
     # Only static, allowlisted evidence is shared. Never forward an entry or user text.
     choices = {key: FACTS[key] for key in facts}
+    # This string is sent to Gemini and is never used as a database query.
     prompt = (
-        "For a faculty member reviewing a scheduling recommendation, select exactly two distinct "
+        "For a faculty member reviewing a scheduling recommendation, select exactly two distinct "  # nosec B608
         "fact IDs from the evidence below. Put the most useful reason first. Prioritize what "
         "changed or why when an alternative was necessary; otherwise emphasize useful eligibility "
         "or timing evidence. Return only JSON with the highlights array.\n"
@@ -88,10 +94,14 @@ def select_highlights(facts):
             "responseSchema": {
                 "type": "OBJECT",
                 "required": ["highlights"],
-                "properties": {"highlights": {
-                    "type": "ARRAY", "minItems": 2, "maxItems": 2,
-                    "items": {"type": "STRING", "enum": list(choices)},
-                }},
+                "properties": {
+                    "highlights": {
+                        "type": "ARRAY",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": {"type": "STRING", "enum": list(choices)},
+                    }
+                },
             },
         },
     }
@@ -110,7 +120,10 @@ def select_highlights(facts):
                 return None
             body = bytearray()
             for chunk in response.iter_bytes():
-                if monotonic() >= deadline or len(body) + len(chunk) > MAX_RESPONSE_BYTES:
+                if (
+                    monotonic() >= deadline
+                    or len(body) + len(chunk) > MAX_RESPONSE_BYTES
+                ):
                     return None
                 body.extend(chunk)
         return parse_highlights(body, choices)
@@ -120,10 +133,10 @@ def select_highlights(facts):
 
 def parse_highlights(body, choices):
     try:
-        candidate, = json.loads(body)["candidates"]
+        (candidate,) = json.loads(body)["candidates"]
         if candidate["finishReason"] != "STOP":
             return None
-        part, = candidate["content"]["parts"]
+        (part,) = candidate["content"]["parts"]
         answer = part["text"]
         if not isinstance(answer, str) or len(answer) > MAX_ANSWER_CHARS:
             return None
