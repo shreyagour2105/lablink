@@ -1,0 +1,18 @@
+<aside class="workspace-sidebar">
+  <details class="workspace-menu" open>
+    <summary>Workspace</summary>
+    <nav aria-label="Workspace navigation">
+      {% if demo_role %}
+        {% if demo_role == "student" %}<a href="{% url 'demo-student' %}#demo-catalog">{% include "icon.html" with name="equipment" %} Sample equipment</a>{% endif %}
+        <a href="#demo-requests">{% include "icon.html" with name="review" %} Simulated requests</a>
+      {% else %}
+        <a href="{% url 'catalog' %}"{% if request.resolver_match.url_name == "catalog" or request.resolver_match.url_name == "resource-detail" %} aria-current="true"{% endif %}>{% include "icon.html" with name="equipment" %} Equipment</a>
+        {% if account.role == "faculty" %}
+          <a href="{% url 'faculty' %}"{% if request.resolver_match.url_name == "faculty" %} aria-current="page"{% endif %}>{% include "icon.html" with name="review" %} Faculty dashboard</a>
+        {% else %}
+          <a href="{% url 'student-history' %}"{% if request.resolver_match.url_name == "student-history" %} aria-current="page"{% endif %}>{% include "icon.html" with name="review" %} My bookings</a>
+        {% endif %}
+      {% endif %}
+    </nav>
+  </details>
+</aside>

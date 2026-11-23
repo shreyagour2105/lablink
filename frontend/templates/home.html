@@ -2,24 +2,42 @@
 {% block title %}LabLink | Campus laboratory access{% endblock %}
 {% block body_class %}landing{% endblock %}
 {% block content %}
-<section class="hero">
-  <div class="wrap hero-inner">
-    <div>
-      <p class="eyebrow">Campus laboratory access</p>
-      <h1>Find the lab equipment your project needs.</h1>
-      <p class="hero-copy">Find equipment across departments, check lab hours, and request time for your project.</p>
-      <a class="button button-ember" href="{% url 'demo' %}">Open LabLink demo {% include "icon.html" with name="arrow" %}</a>
-    </div>
-    <aside class="access-index" aria-label="Who can use LabLink">
-      <div class="access-row">
-        {% include "icon.html" with name="equipment" %}
-        <div><h2>Students</h2><p>Browse equipment, submit a project request, and track its approval.</p></div>
-      </div>
-      <div class="access-row">
-        {% include "icon.html" with name="review" %}
-        <div><h2>Faculty</h2><p>Review requests, compare feasible slots, and manage approvals for your labs.</p></div>
-      </div>
-    </aside>
+<section class="wrap editorial-hero">
+  <p class="eyebrow"><span class="led" aria-hidden="true"></span> Campus laboratory access</p>
+  <h1>Find your equipment.<br><span>Build what’s next.</span></h1>
+  <p class="editorial-copy">Find the lab equipment your project needs, explore availability, and request access in one place.</p>
+  <div class="actions">
+    <a class="button button-paper" href="#workflow">Explore LabLink {% include "icon.html" with name="arrow" %}</a>
+    <a class="button button-dark-outline" href="{% url 'demo' %}">Try Demo</a>
   </div>
+</section>
+
+<section class="wrap product-panel" aria-label="Preview of the LabLink equipment workspace">
+  <div class="product-top">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>LabLink</span>
+    <span class="preview-label">Demo catalogue preview</span>
+  </div>
+  <div class="product-body">
+    <div class="product-intro">
+      <p class="eyebrow">Equipment directory</p>
+      <h2>Start with the right tool.</h2>
+      <p>Search by name, department, or capability.</p>
+    </div>
+    <ul class="preview-units">
+      <li><span class="preview-icon">{% include "icon.html" with name="equipment" %}</span><div><strong>FDM 3D Printer</strong><small>Mechanical Engineering</small></div><span class="preview-slot"><span class="led" aria-hidden="true"></span>09:00</span></li>
+      <li><span class="preview-icon">{% include "icon.html" with name="equipment" %}</span><div><strong>Digital Oscilloscope</strong><small>Electrical Engineering</small></div><span class="preview-slot"><span class="led" aria-hidden="true"></span>10:00</span></li>
+      <li><span class="preview-icon">{% include "icon.html" with name="equipment" %}</span><div><strong>GPU Workstation</strong><small>Computer Science</small></div><span class="preview-slot"><span class="led" aria-hidden="true"></span>11:00</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="wrap editorial-workflow" id="workflow" aria-labelledby="workflow-title">
+  <p class="eyebrow">The booking workflow</p>
+  <h2 id="workflow-title">From finding equipment to getting time on it.</h2>
+  <div class="workflow-grid">
+    <article>{% include "icon.html" with name="equipment" %}<h3>Find a lab</h3><p>Browse equipment across departments and check upcoming lab hours before submitting a request.</p></article>
+    <article>{% include "icon.html" with name="review" %}<h3>Review a request</h3><p>Faculty can compare feasible slots, see conflicts, and record an approval or rejection.</p></article>
+  </div>
+  <a href="{% url 'demo' %}" class="editorial-link">Explore both roles {% include "icon.html" with name="arrow" %}</a>
 </section>
 {% endblock %}

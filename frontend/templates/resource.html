@@ -11,7 +11,8 @@
     <div><dt>Lab</dt><dd>{{ resource.lab_name }}, {{ resource.department }}</dd></div>
     <div><dt>Location</dt><dd>{{ resource.location }}</dd></div>
   </dl>
-  <section aria-labelledby="availability-heading">
+  <div class="resource-layout">
+  <section class="panel availability-panel" aria-labelledby="availability-heading">
     <h2 id="availability-heading">Upcoming availability</h2>
     <p>Upcoming operating hours, excluding closures and approved reservations. Times shown in {{ resource.time_zone }}.</p>
     {% if availability %}
@@ -48,5 +49,6 @@
       </form>
     </section>
   {% endif %}
+  </div>
 </div>
 {% endblock %}

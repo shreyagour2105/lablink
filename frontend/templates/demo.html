@@ -1,16 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Demo mode | LabLink{% endblock %}
+{% block body_class %}landing demo-entry{% endblock %}
 {% block content %}
-<div class="wrap page">
-  <section class="panel sign-in-panel" aria-labelledby="demo-heading">
-    <h1 id="demo-heading">Try LabLink</h1>
-    <p>Explore a fictional campus. All demo bookings and approvals are simulated and stay in this browser.</p>
-    <form method="post" action="{% url 'demo-enter' %}">
-      {% csrf_token %}
-      <button class="button" name="role" value="student">Continue as Student</button>
-      <button class="button button-outline" name="role" value="faculty">Continue as Faculty</button>
-    </form>
-    <p class="section-space"><a href="{% url 'sign-in' %}">Sign in with a campus account</a></p>
-  </section>
-</div>
+<section class="wrap editorial-hero" aria-labelledby="demo-heading">
+  <p class="eyebrow"><span class="led" aria-hidden="true"></span> Interactive demo</p>
+  <h1 id="demo-heading">Pick a role.<br><span>Try the workflow.</span></h1>
+  <p class="editorial-copy">Explore a fictional campus. All demo bookings and approvals are simulated and stay in this browser.</p>
+  <form class="role-grid" method="post" action="{% url 'demo-enter' %}">
+    {% csrf_token %}
+    <div class="role-card">
+      <span class="preview-icon">{% include "icon.html" with name="equipment" %}</span>
+      <h2>Student</h2>
+      <p>Find equipment, choose a time, and track your request.</p>
+      <button class="button button-paper" name="role" value="student">Continue as Student {% include "icon.html" with name="arrow" %}</button>
+    </div>
+    <div class="role-card">
+      <span class="preview-icon">{% include "icon.html" with name="review" %}</span>
+      <h2>Faculty</h2>
+      <p>Review the queue and approve or reject simulated requests.</p>
+      <button class="button button-paper" name="role" value="faculty">Continue as Faculty {% include "icon.html" with name="arrow" %}</button>
+    </div>
+  </form>
+  <a class="editorial-link" href="{% url 'sign-in' %}">Sign in with a campus account {% include "icon.html" with name="arrow" %}</a>
+</section>
 {% endblock %}

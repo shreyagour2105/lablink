@@ -12,8 +12,10 @@
         <div><label for="demo-search">Search equipment</label><input type="search" id="demo-search" name="q" maxlength="100" value="{{ query }}"></div>
         <button class="button" type="submit">Search</button>
       </form>
+      <div class="equipment-grid">
       {% for unit in units %}
-        <article class="panel booking-form">
+        <article class="panel booking-form equipment-card">
+          <span class="equipment-icon">{% include "icon.html" with name="equipment" %}</span>
           <h3>{{ unit.name }}</h3>
           <p>{{ unit.department }} · {{ unit.capability }}</p>
           {% if unit.slots %}
@@ -30,11 +32,13 @@
           {% else %}<p>All demo slots are reserved.</p>{% endif %}
         </article>
       {% empty %}<p>No sample equipment matches your search.</p>{% endfor %}
+      </div>
       {% if at_limit %}<p>This browser has reached the demo request limit.</p>{% endif %}
     </section>
   {% endif %}
   <section class="section-space" aria-labelledby="demo-requests">
     <h2 id="demo-requests">Simulated requests and decisions</h2>
+    <div class="equipment-grid">
     {% for row in requests %}
       <article class="panel booking-form">
         <h3>{{ row.project }}</h3>
@@ -51,6 +55,7 @@
         {% endif %}
       </article>
     {% empty %}<p>No simulated requests yet.</p>{% endfor %}
+    </div>
   </section>
 </div>
 {% endblock %}

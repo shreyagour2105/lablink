@@ -22,20 +22,17 @@
     {% if query or department %}<a href="{% url 'catalog' %}">Clear filters</a>{% endif %}
   </form>
   {% if units %}
-    <div class="panel">
-      <table>
-        <caption class="visually-hidden">Matching equipment</caption>
-        <thead><tr><th scope="col">Equipment</th><th scope="col">Capability</th><th scope="col">Lab</th></tr></thead>
-        <tbody>
-        {% for unit in units %}
-          <tr>
-            <td><a href="{% url 'resource-detail' unit.id %}">{{ unit.name }}</a>{% if unit.sample %}<span class="cell-detail">Demo sample</span>{% endif %}</td>
-            <td>{{ unit.capability }}</td>
-            <td>{{ unit.lab_name }}<span class="cell-detail">{{ unit.department }}</span></td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
+    <div class="equipment-grid">
+      {% for unit in units %}
+        <article class="panel equipment-card">
+          <span class="equipment-icon">{% include "icon.html" with name="equipment" %}</span>
+          <h2><a href="{% url 'resource-detail' unit.id %}">{{ unit.name }}</a></h2>
+          <p>{{ unit.capability }}</p>
+          <p class="cell-detail">{{ unit.lab_name }} · {{ unit.department }}</p>
+          {% if unit.sample %}<span class="status-pill">Demo sample</span>{% endif %}
+          <a class="equipment-link" href="{% url 'resource-detail' unit.id %}" aria-label="View availability for {{ unit.name }}">View availability {% include "icon.html" with name="arrow" %}</a>
+        </article>
+      {% endfor %}
     </div>
   {% else %}
     <p>No equipment matches your search.</p>
