@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build && mkdir -p vercel-static/static && cp frontend/static/lablink.css frontend/dist/app.js frontend/dist/faculty.js vercel-static/static/",
+  "outputDirectory": "vercel-static",
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "{backend/**,frontend/templates/**,shared/**}",
+      "maxDuration": 60
+    }
+  },
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/api/index" }
+  ]
+}

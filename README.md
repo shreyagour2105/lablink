@@ -110,3 +110,11 @@ Faculty can select **Explain first recommendation** on a pending request. Django
 Gemini has no access to booking actions or equipment records. The explanation endpoint is authenticated, lab-scoped, CSRF-protected, and read-only with respect to bookings. Availability, ranking, and approval remain deterministic. Catalogue search uses the existing equipment records and filters.
 
 Set `GEMINI_API_KEY` in the ignored local `.env` or inject it from Secret Manager on Cloud Run. The server sends the key in a request header to `generativelanguage.googleapis.com`. Set `GEMINI_MODEL` to a supported Gemini model if needed. With the key unset, the button uses the rules-based explanation and makes no external call. The request uses a fixed prompt size limit, short connect and read timeouts, and a capped response. Quota errors, network failures, and invalid responses fall back to the deterministic explanation without a retry.
+
+## Vercel Hobby
+
+Import this repository with project root `.`, Framework Preset **Other**, and Node.js 24. Use the build, install and output settings in `vercel.json`. Python 3.12 runs the Django WSGI app, including booking and authentication. Vercel serves the generated static assets before dynamic URLs route to Django.
+
+Configure `DJANGO_SECRET_KEY`, `DJANGO_DEBUG` (false), `DJANGO_BEHIND_PROXY` (true), `DJANGO_ALLOWED_HOSTS` (exact Vercel hostname), `FIREBASE_PROJECT_ID`, `FIREBASE_WEB_API_KEY`, and `LABLINK_GOOGLE_CREDENTIALS_JSON` in the Vercel project. The last variable is a sensitive server-only Google service-account credential for the target Firebase project. Keep it out of Git and grant only the required Firebase Auth and Firestore access. Omit emulator variables. `GEMINI_API_KEY` and `GEMINI_MODEL` are optional.
+
+Enable Email/Password sign-in and provision demo users and the default Firestore database in the real Firebase project. Deploy the Firestore rules and seed the sample catalogue before checking student and faculty flows on the live URL.

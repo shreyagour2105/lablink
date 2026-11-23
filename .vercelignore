@@ -1,0 +1,12 @@
+.env
+.env.*
+.venv
+.git
+node_modules
+staticfiles
+frontend/dist
+vercel-static
+.vercel
+.firebase
+**/__pycache__
+**/*-service-account.json
