@@ -120,3 +120,9 @@ Configure `DJANGO_SECRET_KEY`, `DJANGO_DEBUG` (false), `DJANGO_BEHIND_PROXY` (tr
 Enable Email/Password sign-in and provision demo users and the default Firestore database in the real Firebase project. Deploy the Firestore rules and seed the sample catalogue before checking student and faculty flows on the live URL.
 
 The Vercel adapter also accepts the exact deployment and production hostnames from Vercel's system environment variables. Include any additional domains in `DJANGO_ALLOWED_HOSTS`.
+
+## Public demo mode
+
+Open the landing page and choose **Open LabLink demo**, then enter as Student or Faculty. The demo uses fictional equipment, preset projects, and a signed browser cookie with an eight-hour expiry. Switch roles in the same browser to see your simulated requests and decisions. There is no shared inventory or booking state between browsers. Use a fresh browser profile to start again.
+
+Demo routes use no Firebase services and never grant access to real accounts. The existing campus sign-in remains available at `/sign-in/`. Vercel still needs `DJANGO_SECRET_KEY` for Django and demo cookie signing.

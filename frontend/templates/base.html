@@ -26,7 +26,7 @@
             <button class="text-button" type="submit">Sign out</button>
           </form>
         {% else %}
-          <a href="{% url 'sign-in' %}"{% if request.resolver_match.url_name == "sign-in" %} aria-current="page"{% endif %}>Sign in</a>
+          <a href="{% url 'demo' %}">{% if demo_role %}Switch demo role{% else %}Try demo{% endif %}</a>
         {% endif %}
       </nav>
     </div>

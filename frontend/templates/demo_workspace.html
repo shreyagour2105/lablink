@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ demo_role|capfirst }} demo | LabLink{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <h1>{{ demo_role|capfirst }} demo</h1>
+  <p>Fictional equipment and simulated bookings only. Switch demo roles in this browser to see the same requests from both perspectives.</p>
+  {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+  {% if demo_role == "student" %}
+    <section class="section-space" aria-labelledby="demo-catalog">
+      <h2 id="demo-catalog">Sample equipment</h2>
+      <form method="get" class="panel filters">
+        <div><label for="demo-search">Search equipment</label><input type="search" id="demo-search" name="q" maxlength="100" value="{{ query }}"></div>
+        <button class="button" type="submit">Search</button>
+      </form>
+      {% for unit in units %}
+        <article class="panel booking-form">
+          <h3>{{ unit.name }}</h3>
+          <p>{{ unit.department }} · {{ unit.capability }}</p>
+          {% if unit.slots %}
+            <p>Available simulated slots on the demo day: {{ unit.slots|join:", " }}.</p>
+            {% if not at_limit %}
+              <form method="post" action="{% url 'demo-submit' %}">
+                {% csrf_token %}
+                <input type="hidden" name="unit" value="{{ unit.id }}">
+                <div><label for="project-{{ unit.id }}">Sample project</label><select id="project-{{ unit.id }}" name="project">{% for project in projects %}<option>{{ project }}</option>{% endfor %}</select></div>
+                <div><label for="slot-{{ unit.id }}">Simulated time slot</label><select id="slot-{{ unit.id }}" name="slot">{% for slot in unit.slots %}<option>{{ slot }}</option>{% endfor %}</select></div>
+                <button class="button">Submit simulated request</button>
+              </form>
+            {% endif %}
+          {% else %}<p>All demo slots are reserved.</p>{% endif %}
+        </article>
+      {% empty %}<p>No sample equipment matches your search.</p>{% endfor %}
+      {% if at_limit %}<p>This browser has reached the demo request limit.</p>{% endif %}
+    </section>
+  {% endif %}
+  <section class="section-space" aria-labelledby="demo-requests">
+    <h2 id="demo-requests">Simulated requests and decisions</h2>
+    {% for row in requests %}
+      <article class="panel booking-form">
+        <h3>{{ row.project }}</h3>
+        <p>{{ row.equipment }} · Demo day {{ row.slot }}</p>
+        <p><span class="status-pill" data-state="{{ row.status }}">Simulated {{ row.status }}</span></p>
+        {% if demo_role == "faculty" and row.status == "pending" %}
+          <form method="post" action="{% url 'demo-decide' row.number %}">
+            {% csrf_token %}
+            <div class="actions">
+              <button class="button" name="decision" value="approved">Approve simulation</button>
+              <button class="button button-outline" name="decision" value="rejected">Reject simulation</button>
+            </div>
+          </form>
+        {% endif %}
+      </article>
+    {% empty %}<p>No simulated requests yet.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

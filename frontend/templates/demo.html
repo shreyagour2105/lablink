@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Demo mode | LabLink{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <section class="panel sign-in-panel" aria-labelledby="demo-heading">
+    <h1 id="demo-heading">Try LabLink</h1>
+    <p>Explore a fictional campus. All demo bookings and approvals are simulated and stay in this browser.</p>
+    <form method="post" action="{% url 'demo-enter' %}">
+      {% csrf_token %}
+      <button class="button" name="role" value="student">Continue as Student</button>
+      <button class="button button-outline" name="role" value="faculty">Continue as Faculty</button>
+    </form>
+    <p class="section-space"><a href="{% url 'sign-in' %}">Sign in with a campus account</a></p>
+  </section>
+</div>
+{% endblock %}
