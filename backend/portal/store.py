@@ -29,7 +29,12 @@ class RequestNotFound(Exception):
 @lru_cache(maxsize=2)
 def firestore_client(project_id, emulator_host):
     # The Firestore SDK uses FIRESTORE_EMULATOR_HOST to choose the endpoint.
-    credentials = AnonymousCredentials() if emulator_host else None
+    if emulator_host:
+        credentials = AnonymousCredentials()
+    else:
+        import os
+        os.environ.pop("FIRESTORE_EMULATOR_HOST", None)
+        credentials = None
     return firestore.Client(project=project_id or None, credentials=credentials)
 
 

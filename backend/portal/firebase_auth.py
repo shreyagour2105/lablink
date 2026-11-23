@@ -36,9 +36,9 @@ def _translate_auth_errors(*invalid_token_errors: type[Exception]):
     try:
         yield
     except invalid_credentials as error:
-        raise InvalidCredential from error
+        raise InvalidCredential(str(error)) from error
     except (exceptions.FirebaseError, GoogleAuthError) as error:
-        raise AuthUnavailable from error
+        raise AuthUnavailable(str(error)) from error
 
 
 def verify_id_token(token):
